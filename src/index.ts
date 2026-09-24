@@ -13,6 +13,11 @@ import menuCategoryRoutes from './routes/menuCategory_routes/menuCategory.routes
 import menuItemRoutes from './routes/menu_routes/menuItem.routes.js';
 import restaurantTableRoutes from './routes/restaurantTable_routes/restaurantTable.routes.js';
 import orderRoutes from './routes/order_routes/order.routes.js';
+import inventoryRoutes from './routes/inventory_routes/inventory.routes.js';
+import purchaseRoutes from './routes/purchase_routes/purchase.routes.js';
+import recipeCostRoutes from './routes/recipeCost_routes/recipeCost.routes.js';
+import wastageAdjustmentRoutes from './routes/wastageAdjustment_routes/wastageAdjustment.routes.js';
+import vendorRoutes from './routes/vendor_routes/vendor.routes.js';
 
 // Load environment variables
 dotenv.config({ path: '.env' });
@@ -66,6 +71,11 @@ app.use("/api/menu-category", menuCategoryRoutes);
 app.use("/api/menu-item", menuItemRoutes);
 app.use("/api/table", restaurantTableRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/inventory", inventoryRoutes);
+app.use("/api/purchase", purchaseRoutes);
+app.use("/api/recipe-cost", recipeCostRoutes);
+app.use('/api/wastage-adjustments', wastageAdjustmentRoutes);
+app.use('/api/vendor', vendorRoutes);
 
 // Health Check (Optional but recommended for EC2 monitoring)
 app.get('/health', (req: Request, res: Response) => {
