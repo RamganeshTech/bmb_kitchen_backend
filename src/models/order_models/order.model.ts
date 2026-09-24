@@ -28,6 +28,7 @@ export interface IOrderItem {
 
 export interface IOrder extends Document {
   organizationId: Types.ObjectId;
+  outletId: Types.ObjectId;
   orderNo: string; // Auto-generated order sequence (e.g., ORD-0001)
   billNo?: string; // Generated upon final bill printing / completion
 
@@ -114,10 +115,16 @@ const orderSchema = new Schema<IOrder>(
   {
     organizationId: {
       type: Schema.Types.ObjectId,
-      ref: 'Organization',
+      ref: 'OrganizationModel',
       required: [true, 'Organization ID is required'],
-      index: true,
     },
+
+    outletId: {
+      type: Schema.Types.ObjectId,
+      ref: 'OutletModel',
+      required: [true, 'outlet ID is required'],
+    },
+
     orderNo: {
       type: String,
       required: true,

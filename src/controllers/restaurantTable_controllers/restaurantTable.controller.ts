@@ -12,7 +12,7 @@ export const createTable = async (
 ): Promise<void> => {
   try {
     const { organizationId } = req.params;
-    const { tableName, capacity, location, taxPercent } = req.body;
+    const { tableName, capacity, location, taxPercent, outletId } = req.body;
     const userId = req.user!.userId;
 
     if (!organizationId) {
@@ -30,7 +30,7 @@ export const createTable = async (
       return;
     }
 
-    const table = await tableService.createTable(organizationId, userId, { tableName, capacity, location });
+    const table = await tableService.createTable(organizationId, userId, { tableName, capacity, location , outletId});
     res.status(201).json({ ok: true, data: table });
   } catch (error) {
     next(error);
@@ -44,13 +44,14 @@ export const getActiveTables = async (
 ): Promise<void> => {
   try {
     const { organizationId } = req.params;
+    const {outletId} = req.query
 
     if (!organizationId) {
       res.status(400).json({ ok: false, message: 'Organization ID is required' });
       return;
     }
 
-    const tables = await tableService.getAllActiveTables(organizationId);
+    const tables = await tableService.getAllActiveTables(organizationId, outletId);
     res.status(200).json({ ok: true, data: tables });
   } catch (error) {
     next(error);
@@ -64,13 +65,13 @@ export const getInactiveTables = async (
 ): Promise<void> => {
   try {
     const { organizationId } = req.params;
-
+    const {outletId} = req.query
     if (!organizationId) {
       res.status(400).json({ ok: false, message: 'Organization ID is required' });
       return;
     }
 
-    const tables = await tableService.getAllInactiveTables(organizationId);
+    const tables = await tableService.getAllInactiveTables(organizationId, outletId);
     res.status(200).json({ ok: true, data: tables });
   } catch (error) {
     next(error);
@@ -110,12 +111,15 @@ export const getTableDropdown = async (
   try {
     const { organizationId } = req.params;
 
+    const {outletId} = req.query
+
+
     if (!organizationId) {
       res.status(400).json({ ok: false, message: 'Organization ID is required' });
       return;
     }
 
-    const dropdownList = await tableService.getTableDropdown(organizationId);
+    const dropdownList = await tableService.getTableDropdown(organizationId, outletId);
     res.status(200).json({ ok: true, data: dropdownList });
   } catch (error) {
     next(error);
@@ -129,7 +133,7 @@ export const updateTableDetails = async (
 ): Promise<void> => {
   try {
     const { organizationId, id } = req.params;
-    const { tableName, capacity, location } = req.body;
+    const { tableName, capacity, location, outletId } = req.body;
     const userId = req.user!.userId;
 
     if (!organizationId) {
@@ -146,7 +150,7 @@ export const updateTableDetails = async (
       organizationId,
       id,
       userId,
-      { tableName, capacity, location }
+      { tableName, capacity, location, outletId }
     );
     res.status(200).json({ ok: true, data: updatedTable });
   } catch (error) {

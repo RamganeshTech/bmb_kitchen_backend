@@ -25,6 +25,7 @@ export const createOrder = async (
   data: {
     tableId?: string;
     customerId?: string;
+    outletId?:string;
     orderType: IOrder['orderType'];
     items: Array<Partial<IOrderItem>>;
     taxPercent?: number
@@ -49,6 +50,7 @@ export const createOrder = async (
     tableId: data.tableId,
     customerId: data.customerId,
     orderType: data.orderType,
+    outletId: data.outletId,
     items: formattedItems,
     subTotal: totals.subTotal,
     taxPercent: data.taxPercent || 0, // Default tax, could be dynamic
@@ -247,13 +249,21 @@ export const checkoutOrder = async (
 
 // ── 5. GET ACTIVE ORDERS ──────────────────────────────────────────
 export const getActiveOrders = async (
-  organizationId: string | Types.ObjectId
+  organizationId: string | Types.ObjectId,
+  outletId?: string | Types.ObjectId 
 ): Promise<IOrder[]> => {
-  return OrderModel.find({ 
-    organizationId, 
+// Explicitly type the query object using Record or FilterQuery
+  const query: Record<string, any> = {
+    organizationId,
     orderStatus: 'active',
-    isActive: true 
-  })
+    isActive: true,
+  };
+
+  if (outletId) {
+    query.outletId = outletId;
+  }
+  
+  return OrderModel.find(query)
     .populate('tableId', 'tableName status') // Assumes Table schema has these fields
     .populate('customerId', 'name phone')
     .sort({ createdAt: -1 });

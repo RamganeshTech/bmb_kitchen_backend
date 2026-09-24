@@ -18,6 +18,10 @@ import purchaseRoutes from './routes/purchase_routes/purchase.routes.js';
 import recipeCostRoutes from './routes/recipeCost_routes/recipeCost.routes.js';
 import wastageAdjustmentRoutes from './routes/wastageAdjustment_routes/wastageAdjustment.routes.js';
 import vendorRoutes from './routes/vendor_routes/vendor.routes.js';
+import outletRoutes from './routes/outlet_routes/outlet.routes.js';
+import offerRoutes from './routes/offer_routes/offer.routes.js';
+import expenseRoutes from './routes/expense_routes/expense.routes.js';
+import loyaltyProgramRoutes from './routes/loyaltyProgram_routes/loyaltyProgram.routes.js';
 
 // Load environment variables
 dotenv.config({ path: '.env' });
@@ -76,6 +80,10 @@ app.use("/api/purchase", purchaseRoutes);
 app.use("/api/recipe-cost", recipeCostRoutes);
 app.use('/api/wastage-adjustments', wastageAdjustmentRoutes);
 app.use('/api/vendor', vendorRoutes);
+app.use('/api/outlet', outletRoutes);
+app.use('/api/expense', expenseRoutes);
+app.use('/api/offer', offerRoutes);
+app.use('/api/loyalty-program', loyaltyProgramRoutes);
 
 // Health Check (Optional but recommended for EC2 monitoring)
 app.get('/health', (req: Request, res: Response) => {

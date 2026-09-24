@@ -11,7 +11,7 @@ export const placeNewOrder = async (
 ): Promise<void> => {
   try {
     const { organizationId } = req.params;
-    const { tableId, customerId, orderType, items } = req.body;
+    const { tableId, customerId, orderType, items, outletId } = req.body;
     const userId = req.user!.userId;
 
     if (!organizationId || !Types.ObjectId.isValid(organizationId)) {
@@ -21,6 +21,11 @@ export const placeNewOrder = async (
 
     if (tableId && !Types.ObjectId.isValid(tableId)) {
       res.status(400).json({ ok: false, message: 'A valid Table ID is required' });
+      return;
+    }
+
+    if (!outletId || !Types.ObjectId.isValid(outletId)) {
+      res.status(400).json({ ok: false, message: 'A valid outlet ID is required' });
       return;
     }
 
@@ -37,6 +42,7 @@ export const placeNewOrder = async (
     const order = await orderService.createOrder(organizationId, userId, {
       tableId,
       customerId,
+      outletId,
       orderType,
       items,
     });
@@ -193,12 +199,14 @@ export const getActiveOrders = async (
   try {
     const { organizationId } = req.params;
     
+    const {outletId}= req.query
+
     if (!organizationId || !Types.ObjectId.isValid(organizationId)) {
       res.status(400).json({ ok: false, message: 'A valid Organization ID is required' });
       return;
     }
 
-    const orders = await orderService.getActiveOrders(organizationId);
+    const orders = await orderService.getActiveOrders(organizationId, outletId);
     res.status(200).json({ ok: true, data: orders });
   } catch (error) {
     next(error);

@@ -158,7 +158,7 @@ import type { Types } from 'mongoose';
 export const createTable = async (
   organizationId: string | Types.ObjectId,
   userId: string | Types.ObjectId,
-  data: { tableName: string; capacity: number; location?: string }
+  data: { tableName: string; capacity: number; location?: string , outletId: string | Types.ObjectId}
 ): Promise<ITable> => {
   const table = await RestaurantTableModel.create({
     ...data,
@@ -171,16 +171,40 @@ export const createTable = async (
 
 // ── GET ALL ACTIVE ────────────────────────────────────────────────
 export const getAllActiveTables = async (
-  organizationId: string | Types.ObjectId
+  organizationId: string | Types.ObjectId,
+    outletId?: string | Types.ObjectId 
+  
 ): Promise<ITable[]> => {
-  return RestaurantTableModel.find({ organizationId, isActive: true }).sort({ tableNo: 1 });
+
+  const query:Record<string, any> = {
+    organizationId,
+     isActive: true
+  }
+
+  if(outletId){
+    query.outletId = outletId
+  }
+  return RestaurantTableModel.find(query).sort({ tableNo: 1 });
 };
 
 // ── GET ALL INACTIVE ──────────────────────────────────────────────
 export const getAllInactiveTables = async (
-  organizationId: string | Types.ObjectId
+  organizationId: string | Types.ObjectId,
+    outletId?: string | Types.ObjectId 
+
 ): Promise<ITable[]> => {
-  return RestaurantTableModel.find({ organizationId, isActive: false }).sort({ tableNo: 1 });
+
+  
+  const query:Record<string, any> = {
+    organizationId,
+     isActive: false
+  }
+
+  if(outletId){
+    query.outletId = outletId
+  }
+
+  return RestaurantTableModel.find(query).sort({ tableNo: 1 });
 };
 
 // ── GET SINGLE BY ID ──────────────────────────────────────────────
@@ -195,9 +219,21 @@ export const getTableById = async (
 
 // ── GET DROPDOWN (ID, NO, NAME, CAPACITY, STATUS) ─────────────────
 export const getTableDropdown = async (
-  organizationId: string | Types.ObjectId
+  organizationId: string | Types.ObjectId,
+  outletId?: string | Types.ObjectId
 ): Promise<Array<{ _id: Types.ObjectId; tableNo: string; tableName: string; capacity: number; status: string }>> => {
-  return RestaurantTableModel.find({ organizationId, isActive: true })
+
+  
+  const query:Record<string, any> = {
+    organizationId,
+     isActive: true
+  }
+
+  if(outletId){
+    query.outletId = outletId
+  }
+
+  return RestaurantTableModel.find(query)
     .select('_id tableNo tableName capacity status')
     .sort({ tableNo: 1 })
     .lean();
@@ -208,7 +244,7 @@ export const updateTableDetails = async (
   organizationId: string | Types.ObjectId,
   tableId: string,
   userId: string | Types.ObjectId,
-  updates: Partial<Pick<ITable, 'tableName' | 'capacity' | 'location'>>
+  updates: Partial<Pick<ITable, 'tableName' | 'capacity' | 'location' | 'outletId'>>
 ): Promise<ITable> => {
   const table = await RestaurantTableModel.findOneAndUpdate(
     { _id: tableId, organizationId },

@@ -11,6 +11,7 @@ export interface IReservation {
 
 export interface ITable extends Document {
   organizationId: Types.ObjectId;
+  outletId: Types.ObjectId;
   tableNo: string;
   tableName: string;
   capacity: number;
@@ -42,8 +43,13 @@ const tableSchema = new Schema<ITable>(
       required: true,
       index: true,
     },
-    tableNo: {type: String,trim: true,},
-    tableName: {type: String,trim: true, required:true},
+    outletId: {
+      type: Schema.Types.ObjectId,
+      ref: 'OutletModel',
+      required: [true, 'outlet ID is required'],
+    },
+    tableNo: { type: String, trim: true, },
+    tableName: { type: String, trim: true, required: true },
     capacity: {
       type: Number,
       required: [true, 'Table capacity is required'],
