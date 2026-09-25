@@ -47,7 +47,7 @@ const purchaseItemSchema = new Schema<IPurchaseItem>(
       min: 0,
     },
   },
-  { _id: false }
+  { _id: true }
 );
 
 const purchaseSchema = new Schema<IPurchase>(

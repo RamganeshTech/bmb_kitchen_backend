@@ -44,7 +44,7 @@ const recipeIngredientSchema = new Schema<IRecipeIngredient>(
       min: 0,
     },
   },
-  { _id: false }
+  { _id: true }
 );
 
 const recipeCostSchema = new Schema<IRecipeCost>(
