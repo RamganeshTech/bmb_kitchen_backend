@@ -41,7 +41,6 @@ const tableSchema = new Schema<ITable>(
       type: Schema.Types.ObjectId,
       ref: 'Organization',
       required: true,
-      index: true,
     },
     outletId: {
       type: Schema.Types.ObjectId,

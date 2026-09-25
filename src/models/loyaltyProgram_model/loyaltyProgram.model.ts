@@ -34,7 +34,7 @@ const loyaltyTierSchema = new Schema<ILoyaltyTier>(
       min: 0,
     },
   },
-  { _id: false }
+  { _id: true }
 );
 
 const loyaltyProgramSchema = new Schema<ILoyaltyProgram>(

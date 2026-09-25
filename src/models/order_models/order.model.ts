@@ -10,7 +10,7 @@ export type ItemKitchenStatus =
 export type OrderStatus = 'active' | 'completed' | 'cancelled';
 export type PaymentStatus = 'pending' | 'paid' | 'partially_paid';
 export type PaymentMethod = 'cash' | 'card' | 'upi' | 'split' | 'unpaid';
-export type OrderType = 'dine_in' | 'takeaway' | 'delivery';
+export type OrderType = 'dine_in' | 'takeaway' | 'delivery' | 'online';
 
 export interface IOrderItem {
   _id?: Types.ObjectId;
@@ -35,7 +35,7 @@ export interface IOrder extends Document {
   tableId?: Types.ObjectId; // Reference to RestaurantTable (if dine_in)
   orderType: OrderType;
 
- customerId?: Types.ObjectId;
+  customerId?: Types.ObjectId;
 
   items: IOrderItem[];
 
@@ -138,20 +138,22 @@ const orderSchema = new Schema<IOrder>(
       type: Schema.Types.ObjectId,
       ref: 'RestaurantTable',
       index: true,
+      default: null
     },
     orderType: {
       type: String,
-      enum: ['dine_in', 'takeaway', 'delivery'],
+      enum: ['dine_in', 'takeaway', 'delivery', "online"],
       default: 'dine_in',
     },
     loyaltyPointsRedeemed: {
       type: Number,
       default: 0,
     },
-    
-   customerId: {
+
+    customerId: {
       type: Schema.Types.ObjectId,
       ref: 'Customer', // Link to the new Customer model
+      default: null
     },
     items: [orderItemSchema],
 
@@ -189,13 +191,13 @@ const orderSchema = new Schema<IOrder>(
       type: String,
       enum: ['active', 'completed', 'cancelled'],
       default: 'active',
-      index: true,
+      // index: true,
     },
     paymentStatus: {
       type: String,
       enum: ['pending', 'paid', 'partially_paid'],
       default: 'pending',
-      index: true,
+      // index: true,
     },
     paymentMethod: {
       type: String,
@@ -204,6 +206,7 @@ const orderSchema = new Schema<IOrder>(
     },
     paidAt: {
       type: Date,
+      default: null
     },
     createdBy: {
       type: Schema.Types.ObjectId,
@@ -213,6 +216,7 @@ const orderSchema = new Schema<IOrder>(
     updatedBy: {
       type: Schema.Types.ObjectId,
       ref: 'UserModel',
+      default: null
     },
     isActive: {
       type: Boolean,
@@ -258,7 +262,7 @@ orderSchema.pre('save', async function (this: IOrder) {
 });
 
 // Compound index to ensure uniqueness of order numbers per organization
-orderSchema.index({ organizationId: 1, orderNo: 1 , customerId: 1});
+orderSchema.index({ organizationId: 1, orderNo: 1, customerId: 1 });
 
 const OrderModel = model<IOrder>('Order', orderSchema);
 

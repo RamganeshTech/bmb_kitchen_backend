@@ -56,4 +56,14 @@ orderRoutes.patch(
   orderController.cancelOrder
 );
 
+// GET /api/orders/v1/:organizationId/:id/cancel (Cancel order & Free Table)
+
+orderRoutes.get(
+  '/v1/:organizationId/orders/:orderType',
+  multiAuthRole('owner', 'admin', 'cto', "staff"), // Staff usually cannot cancel entire orders, requires Admin/CTO/Owner
+  orderController.listOrdersByType
+);
+
+
+
 export default orderRoutes;

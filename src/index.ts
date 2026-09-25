@@ -22,6 +22,11 @@ import outletRoutes from './routes/outlet_routes/outlet.routes.js';
 import offerRoutes from './routes/offer_routes/offer.routes.js';
 import expenseRoutes from './routes/expense_routes/expense.routes.js';
 import loyaltyProgramRoutes from './routes/loyaltyProgram_routes/loyaltyProgram.routes.js';
+import dayClosingRoutes from './routes/dayClosing_routes/dayClosing.routes.js';
+import subscriptionRoutes from './routes/subscription_routes/subscription.routes.js';
+import taxSettingsRoutes from './routes/taxSetting_routes/taxSetting.routes.js';
+import centralKitchenRoutes from './routes/centralKitchen_routes/centralKitchen.routes.js';
+import paymentRoutes from './routes/order_routes/payment_routes/payment.routes.js';
 
 // Load environment variables
 dotenv.config({ path: '.env' });
@@ -84,6 +89,15 @@ app.use('/api/outlet', outletRoutes);
 app.use('/api/expense', expenseRoutes);
 app.use('/api/offer', offerRoutes);
 app.use('/api/loyalty-program', loyaltyProgramRoutes);
+
+
+app.use('/api/day-closing', dayClosingRoutes);
+app.use('/api/subscription', subscriptionRoutes);
+app.use('/api/tax-settings', taxSettingsRoutes);
+app.use('/api/central-kitchen', centralKitchenRoutes);
+app.use('/api/payment', paymentRoutes);
+
+
 
 // Health Check (Optional but recommended for EC2 monitoring)
 app.get('/health', (req: Request, res: Response) => {

@@ -238,3 +238,36 @@ export const getOrderById = async (
     next(error);
   }
 };
+
+
+//  TO FILTER OUT THE TAKEAWAY , ONLINE DELIVERY , IN DINE ORDERS
+
+
+export const listOrdersByType = async (req: RoleBasedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { organizationId, orderType } = req.params;
+    if (!organizationId) {
+      return res.status(400).json({ ok: false, message: 'organizationId is required' });
+    }
+    if (!orderType) {
+      return res.status(400).json({ ok: false, message: 'orderType is required' });
+    }
+
+    const { outletId, orderStatus, paymentStatus, scope, from, to, page, limit } = req.query;
+
+    const result = await orderService.listOrdersByType(organizationId, orderType as any, {
+      outletId: outletId as string,
+      orderStatus: orderStatus as any,
+      paymentStatus: paymentStatus as any,
+      scope: scope as any,
+      from: from as string,
+      to: to as string,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+
+    return res.status(200).json({ ok: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
