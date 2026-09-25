@@ -21,6 +21,7 @@ export interface IActionPermission {
 
 export interface IUser extends Document {
   organizationId: Types.ObjectId;
+  specificRole?: Types.ObjectId;
   email?: string;
   userName: string;
   password: string;
@@ -61,10 +62,18 @@ const userSchema = new Schema<IUser>(
       required: true,
     },
 
+
+    specificRole: {
+      type: Schema.Types.ObjectId,
+      ref: "RoleModel",
+      default: null
+    },
+
+
     email: { type: String, default: "" },
     userName: { type: String, required: true },
     password: { type: String, required: true },
-    
+
     permissions: {
       type: Map,
       of: actionPermissionSchema,

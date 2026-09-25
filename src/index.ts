@@ -27,6 +27,9 @@ import subscriptionRoutes from './routes/subscription_routes/subscription.routes
 import taxSettingsRoutes from './routes/taxSetting_routes/taxSetting.routes.js';
 import centralKitchenRoutes from './routes/centralKitchen_routes/centralKitchen.routes.js';
 import paymentRoutes from './routes/order_routes/payment_routes/payment.routes.js';
+import printerRoutes from './routes/printer_routes/printer.routes.js';
+import supportTicketRoutes from './routes/supportTicket_routes/supportTicket.routes.js';
+import roleRoutes from './routes/user_router/role_routes/role.routes.js';
 
 // Load environment variables
 dotenv.config({ path: '.env' });
@@ -97,6 +100,9 @@ app.use('/api/tax-settings', taxSettingsRoutes);
 app.use('/api/central-kitchen', centralKitchenRoutes);
 app.use('/api/payment', paymentRoutes);
 
+app.use('/api/printer', printerRoutes);
+app.use('/api/support-ticket', supportTicketRoutes);
+app.use('/api/role', roleRoutes);
 
 
 // Health Check (Optional but recommended for EC2 monitoring)
