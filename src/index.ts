@@ -106,7 +106,7 @@ app.use('/api/role', roleRoutes);
 
 
 // Health Check (Optional but recommended for EC2 monitoring)
-app.get('/health', (req: Request, res: Response) => {
+app.get('/api/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'active', message: 'server running', timestamp: new Date().toISOString() });
 });
 
