@@ -30,6 +30,11 @@ import paymentRoutes from './routes/order_routes/payment_routes/payment.routes.j
 import printerRoutes from './routes/printer_routes/printer.routes.js';
 import supportTicketRoutes from './routes/supportTicket_routes/supportTicket.routes.js';
 import roleRoutes from './routes/user_router/role_routes/role.routes.js';
+import reportRoutes from './routes/report_routes/report.routes.js';
+import dashboardRoutes from './routes/dashboard_routes/dashboard.routes.js';
+import notificationSettingsRoutes from './routes/notification_routes/notificationSetting.routes.js';
+import notificationRoutes from './routes/notification_routes/notification.routes.js';
+import integrationRoutes from './routes/integration_routes/integration.routes.js';
 
 // Load environment variables
 dotenv.config({ path: '.env' });
@@ -104,6 +109,12 @@ app.use('/api/printer', printerRoutes);
 app.use('/api/support-ticket', supportTicketRoutes);
 app.use('/api/role', roleRoutes);
 
+app.use('/api/report', reportRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+
+app.use('/api/notification-settings', notificationSettingsRoutes);
+app.use('/api/notification', notificationRoutes);
+app.use('/api/integration', integrationRoutes);
 
 // Health Check (Optional but recommended for EC2 monitoring)
 app.get('/api/health', (req: Request, res: Response) => {
