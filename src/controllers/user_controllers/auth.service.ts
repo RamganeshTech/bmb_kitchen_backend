@@ -55,7 +55,7 @@ export const registerUser = async (
 
 export const getByUserId = async (userId: string): Promise<{ user: IUser }> => {
 
-    const user = await UserModel.findById(userId).select("-password")
+    const user = await UserModel.findById(userId).populate("organizationId", "_id name logo").select("-password")
 
     if (!user) {
         throw new ApiError(401, "Invalid email or password");
