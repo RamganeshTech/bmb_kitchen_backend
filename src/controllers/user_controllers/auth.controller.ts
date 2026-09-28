@@ -212,6 +212,38 @@ export const resetPassword = async (
 
 
 
+export const updateProfileImage = async (
+  req: RoleBasedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { organizationId, userId } = req.params;
+    const file = req.file;
+
+    if (!organizationId) {
+      res.status(400).json({ ok: false, message: "organizationId is required" });
+      return;
+    }
+    if (!userId) {
+      res.status(400).json({ ok: false, message: "userId is required" });
+      return;
+    }
+    if (!file) {
+      res.status(400).json({ ok: false, message: "file is required" });
+      return;
+    }
+
+    const result = await authService.updateProfileImage(organizationId, userId, file);
+
+    res.status(200).json({ ok: true, data: result, message: "Profile image updated successfully" });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
 export const updateUserPermissions = async (
   req: Request,
   res: Response,

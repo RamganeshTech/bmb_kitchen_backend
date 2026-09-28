@@ -6,6 +6,7 @@ import UserModel from "../../models/user_models/user.model.js";
 import { ApiError } from "../../utils/apiError.js";
 import crypto from "crypto";
 import { sendResetPasswordEmail } from "../../utils/mail_services/fogotPasswordmailer.js";
+import { uploadFileToS3 } from "../../utils/s3Upload.js";
 
 
 const SALT_ROUNDS = 12;
@@ -223,3 +224,35 @@ export const updateUserPermissions = async (
 
   return updatedUser;
 };
+
+
+
+export const updateProfileImage = async (
+  organizationId: string,
+  userId: string,
+  file: Express.Multer.File
+): Promise<{ user: IUser }> => {
+  if (!file.mimetype.startsWith("image/")) {
+    throw new ApiError(400, "Only image files are allowed for profile image");
+  }
+
+  const user = await UserModel.findOne({ _id: userId, organizationId });
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const uploadedData = await uploadFileToS3(file);
+
+  user.profileImage = {
+    type: "image",
+    key: uploadedData.key,
+    url: uploadedData.url,
+    originalName: uploadedData.originalName,
+    uploadedAt: uploadedData.uploadedAt,
+  };
+
+  await user.save();
+
+  return { user };
+};
+
