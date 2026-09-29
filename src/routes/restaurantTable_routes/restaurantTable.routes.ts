@@ -50,6 +50,16 @@ restaurantTableRoutes.patch(
   tableController.reserveTable
 );
 
+
+restaurantTableRoutes.patch(
+  "/v1/:organizationId/:id/reserve-update",
+  multiAuthRole("owner", "admin", "cto", "staff"),
+  tableController.updateReservation
+);
+
+
+
+
 // ── ACTIONS ON SPECIFIC TABLE ───────────────────────────────────
 // PATCH /api/table/v1/:organizationId/:id/recover (Restore soft-deleted)
 restaurantTableRoutes.patch(

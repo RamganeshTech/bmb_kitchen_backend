@@ -1,6 +1,6 @@
 import MenuItemModel, { type IMenuItem } from '../../models/menu_models/menuItem.model.js';
 import { ApiError } from '../../utils/apiError.js';
-import type { Types } from 'mongoose';
+import  { Types } from 'mongoose';
 
 // ── CREATE ────────────────────────────────────────────────────────
 export const createMenuItem = async (
@@ -26,13 +26,115 @@ export const createMenuItem = async (
   return item;
 };
 
+
+export interface IMenuItemFilters {
+  search?: string;
+  categoryId?: string | string[];
+  foodType?: 'Veg' | 'Non-veg' | 'Egg' | string;
+  minPrice?: number | string;
+  maxPrice?: number | string;
+  maxPrepTime?: number | string;
+  hasVariants?: boolean | string;
+  hasAddOns?: boolean | string;
+  sortBy?: 'name' | 'basePrice' | 'prepTime' | 'createdAt';
+  sortOrder?: 'asc' | 'desc';
+}
+
 // ── GET ALL ACTIVE ────────────────────────────────────────────────
 export const getAllActiveMenuItems = async (
-  organizationId: string | Types.ObjectId
+  organizationId: string | Types.ObjectId,
+  filters: IMenuItemFilters = {}
 ): Promise<IMenuItem[]> => {
-  return MenuItemModel.find({ organizationId, isActive: true })
+ const query:any = {
+    organizationId: new Types.ObjectId(organizationId),
+    isActive: true,
+  };
+
+  // 1. Search by Name or Item Number (Case-insensitive regex)
+  if (filters.search && filters.search.trim()) {
+    const searchRegex = new RegExp(filters.search.trim(), 'i');
+    query.$or = [
+      { name: { $regex: searchRegex } },
+      { menuItemNo: { $regex: searchRegex } },
+    ];
+  }
+
+  // 2. Filter by Category ID (supports single ID or comma-separated / array)
+  if (filters.categoryId) {
+    if (Array.isArray(filters.categoryId)) {
+      query.categoryId = {
+        $in: filters.categoryId.map((id) => new Types.ObjectId(id)),
+      };
+    } else if (typeof filters.categoryId === 'string') {
+      const categoryIds = filters.categoryId
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean);
+
+      if (categoryIds.length === 1) {
+        query.categoryId = new Types.ObjectId(categoryIds[0]);
+      } else if (categoryIds.length > 1) {
+        query.categoryId = {
+          $in: categoryIds.map((id) => new Types.ObjectId(id)),
+        };
+      }
+    }
+  }
+
+  // 3. Filter by Food Type (Veg, Non-veg, Egg - supports comma-separated)
+  if (filters.foodType) {
+    if (typeof filters.foodType === 'string' && filters.foodType.includes(',')) {
+      const foodTypes = filters.foodType.split(',').map((t) => t.trim());
+      query.foodType = { $in: foodTypes as any };
+    } else {
+      query.foodType = filters.foodType as any;
+    }
+  }
+
+  // 4. Base Price Range (minPrice / maxPrice)
+  if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
+    query.basePrice = {};
+    if (filters.minPrice !== undefined && filters.minPrice !== '') {
+      query.basePrice.$gte = Number(filters.minPrice);
+    }
+    if (filters.maxPrice !== undefined && filters.maxPrice !== '') {
+      query.basePrice.$lte = Number(filters.maxPrice);
+    }
+  }
+
+  // 5. Max Preparation Time
+  if (filters.maxPrepTime !== undefined && filters.maxPrepTime !== '') {
+    query.prepTime = { $lte: Number(filters.maxPrepTime) };
+  }
+
+  // 6. Has Variants Filter ($exists + $ne: [])
+  if (filters.hasVariants !== undefined && filters.hasVariants !== '') {
+    const wantsVariants = filters.hasVariants === true || filters.hasVariants === 'true';
+    if (wantsVariants) {
+      query['variants.0'] = { $exists: true }; // At least 1 item
+    } else {
+      query.variants = { $size: 0 };
+    }
+  }
+
+  // 7. Has Add-ons Filter
+  if (filters.hasAddOns !== undefined && filters.hasAddOns !== '') {
+    const wantsAddOns = filters.hasAddOns === true || filters.hasAddOns === 'true';
+    if (wantsAddOns) {
+      query['addOns.0'] = { $exists: true }; // At least 1 item
+    } else {
+      query.addOns = { $size: 0 };
+    }
+  }
+
+  // 8. Sorting Configuration
+  const sortDirection = filters.sortOrder === 'asc' ? 1 : -1;
+  const sortField = filters.sortBy || 'createdAt';
+  const sortOptions: Record<string, 1 | -1> = { [sortField]: sortDirection };
+
+  return MenuItemModel.find(query)
     .populate('categoryId', '_id name menuCategoryNo')
-    .sort({ createdAt: -1 });
+    .sort(sortOptions);
 };
 
 // ── GET ALL INACTIVE ──────────────────────────────────────────────

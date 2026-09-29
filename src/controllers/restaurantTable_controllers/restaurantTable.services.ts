@@ -295,6 +295,35 @@ export const reserveTable = async (
   return table;
 };
 
+
+
+export const updateReservation = async (
+  organizationId: string | Types.ObjectId,
+  tableId: string,
+  userId: string | Types.ObjectId,
+  reservationData: IReservation
+): Promise<ITable> => {
+  const table = await RestaurantTableModel.findOne({
+    _id: tableId,
+    organizationId,
+  });
+
+  if (!table) {
+    throw new ApiError(404, 'Table not found');
+  }
+
+  if (table.status !== 'reserved') {
+    throw new ApiError(409, 'Table is not currently reserved');
+  }
+
+  table.currentReservation = reservationData;
+  table.updatedBy = userId as Types.ObjectId;
+
+  await table.save();
+
+  return table;
+};
+
 // ── SOFT DELETE (DEACTIVATE) ──────────────────────────────────────
 export const softDeleteTable = async (
   organizationId: string | Types.ObjectId,

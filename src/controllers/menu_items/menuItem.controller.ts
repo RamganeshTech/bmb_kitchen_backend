@@ -46,12 +46,14 @@ export const getActiveMenuItems = async (
   try {
     const { organizationId } = req.params;
 
+    const filters = req.query
+
     if (!organizationId) {
       res.status(400).json({ ok: false, message: 'Organization ID is required' });
       return;
     }
 
-    const items = await menuItemService.getAllActiveMenuItems(organizationId);
+    const items = await menuItemService.getAllActiveMenuItems(organizationId, filters);
     
     res.status(200).json({ ok: true, data: items });
   } catch (error) {

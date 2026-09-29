@@ -12,7 +12,7 @@ export const createTable = async (
 ): Promise<void> => {
   try {
     const { organizationId } = req.params;
-    const { tableName, capacity, location, taxPercent, outletId } = req.body;
+    const { tableName, capacity, location, outletId } = req.body;
     const userId = req.user!.userId;
 
     if (!organizationId) {
@@ -224,6 +224,60 @@ export const reserveTable = async (
 
     const updatedTable = await tableService.reserveTable(organizationId, id, userId, reservationData);
     res.status(200).json({ ok: true, message: 'Table reserved successfully', data: updatedTable });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+export const updateReservation = async (
+  req: RoleBasedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { organizationId, id } = req.params;
+    const { customerName, reservationTime, phone, notes } = req.body;
+    const userId = req.user!.userId;
+
+    if (!organizationId) {
+      res.status(400).json({ ok: false, message: 'Organization ID is required' });
+      return;
+    }
+
+    if (!id) {
+      res.status(400).json({ ok: false, message: 'ID is required' });
+      return;
+    }
+
+    if (!customerName || !reservationTime) {
+      res.status(400).json({
+        ok: false,
+        message: 'Customer name and reservation time are required',
+      });
+      return;
+    }
+
+    const reservationData = {
+      customerName,
+      reservationTime: new Date(reservationTime),
+      phone,
+      notes,
+    };
+
+    const updatedTable = await tableService.updateReservation(
+      organizationId,
+      id,
+      userId,
+      reservationData
+    );
+
+    res.status(200).json({
+      ok: true,
+      message: 'Reservation updated successfully',
+      data: updatedTable,
+    });
   } catch (error) {
     next(error);
   }
