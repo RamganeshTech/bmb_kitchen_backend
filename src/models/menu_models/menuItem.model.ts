@@ -1,4 +1,5 @@
 import { Schema, model, Document, Types } from 'mongoose';
+import { IUpload } from '../user_models/user.model.js';
 
 export type FoodType = 'Veg' | 'Non-veg' | 'Egg';
 
@@ -19,6 +20,7 @@ export interface IMenuItem extends Document {
   categoryId: Types.ObjectId;
   basePrice: number;
   foodType: FoodType;
+  images: IUpload[]
   prepTime: number; // in minutes
   variants: IVariant[];
   addOns: IAddOn[];
@@ -47,6 +49,15 @@ const addOnSchema = new Schema<IAddOn>(
   { _id: false }
 );
 
+
+const uploadSchema = new Schema<IUpload>({
+  type: { type: String, enum: ["image"] },
+  key: { type: String, },
+  url: { type: String, },
+  originalName: String,
+  uploadedAt: { type: Date, default: Date.now }
+}, {_id:true});
+
 const menuItemSchema = new Schema<IMenuItem>(
   {
     organizationId: {
@@ -58,6 +69,9 @@ const menuItemSchema = new Schema<IMenuItem>(
     menuItemNo: {
       type: String,
       trim: true,
+    },
+    images: {
+      type: [uploadSchema], default: []
     },
     name: {
       type: String,

@@ -35,7 +35,7 @@ export const getInventoryList = async (
     organizationId,
     isActive: true,
   })
-    .populate('vendorId', 'name _id')
+    .populate('vendorId', 'vendorName _id')
     .sort({ createdAt: -1 });
 
   return items;
@@ -49,7 +49,7 @@ export const getInactiveInventoryList = async (
     organizationId,
     isActive: false,
   })
-    .populate('vendorId', 'name _id')
+    .populate('vendorId', 'vendorName _id')
     .sort({ updatedAt: -1 });
 
   return items;
@@ -75,7 +75,7 @@ export const getInventoryById = async (
   const item = await InventoryModel.findOne({
     _id: inventoryId,
     organizationId,
-  }).populate('vendorId', 'name _id');
+  }).populate('vendorId', 'vendorName _id');
 
   if (!item) {
     throw new ApiError(404, 'Inventory item not found');

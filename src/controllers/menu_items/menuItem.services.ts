@@ -1,12 +1,42 @@
 import MenuItemModel, { type IMenuItem } from '../../models/menu_models/menuItem.model.js';
 import { ApiError } from '../../utils/apiError.js';
 import  { Types } from 'mongoose';
+import { uploadFileToS3 } from '../../utils/s3Upload.js';
+import { IUpload } from '../../models/user_models/user.model.js';
+
+
+export const MAX_MENU_ITEM_IMAGES = 5;
+
+const assertImages = (files: Express.Multer.File[]) => {
+  for (const file of files) {
+    if (!file.mimetype.startsWith('image/')) {
+      throw new ApiError(400, `Only image files are allowed (${file.originalname})`);
+    }
+  }
+};
+
+
+const uploadImages = async (files: Express.Multer.File[]) =>
+  Promise.all(
+    files.map(async (file) => {
+      const up = await uploadFileToS3(file);
+      return {
+        type: 'image' as const,
+        key: up.key,
+        url: up.url,
+        originalName: up.originalName,
+        uploadedAt: up.uploadedAt,
+      };
+    })
+  );
 
 // ── CREATE ────────────────────────────────────────────────────────
 export const createMenuItem = async (
   organizationId: string | Types.ObjectId,
   userId: string | Types.ObjectId,
-  data: Partial<IMenuItem>
+  data: Partial<IMenuItem>,
+    files: Express.Multer.File[] = []
+
 ): Promise<IMenuItem> => {
   const existingItem = await MenuItemModel.findOne({
     organizationId,
@@ -17,8 +47,19 @@ export const createMenuItem = async (
     throw new ApiError(409, 'Menu item with this name already exists');
   }
 
+  if (files && files?.length > MAX_MENU_ITEM_IMAGES) {
+    throw new ApiError(400, `You can upload up to ${MAX_MENU_ITEM_IMAGES} images per item`);
+  }
+
+
+    assertImages(files);
+
+      const images = await uploadImages(files);
+
+
   const item = await MenuItemModel.create({
     ...data,
+    images,
     organizationId,
     createdBy: userId,
   });
@@ -183,6 +224,62 @@ export const updateMenuItem = async (
   ).populate('categoryId', '_id name menuCategoryNo');
 
   if (!item) throw new ApiError(404, 'Menu item not found');
+  return item;
+};
+
+
+// ── ADD EXTRA IMAGES ──────────────────────────────────────────────
+export const addMenuItemImages = async (
+  organizationId: string,
+  menuItemId: string,
+  userId: string,
+  files: Express.Multer.File[]
+): Promise<IMenuItem> => {
+  const item = await MenuItemModel.findOne({ _id: menuItemId, organizationId });
+  if (!item) throw new ApiError(404, 'Menu item not found');
+
+  const current = item.images ?? [];
+  if (current.length + files.length > MAX_MENU_ITEM_IMAGES) {
+    throw new ApiError(
+      400,
+      `An item can have up to ${MAX_MENU_ITEM_IMAGES} images (currently ${current.length})`
+    );
+  }
+  assertImages(files);
+
+  const uploaded = await uploadImages(files);
+  item.images = [...current, ...uploaded] as IUpload[];
+  item.updatedBy = userId as unknown as Types.ObjectId;
+  await item.save();
+
+  return item;
+};
+
+// ── REMOVE ONE IMAGE ──────────────────────────────────────────────
+export const removeMenuItemImage = async (
+  organizationId: string,
+  menuItemId: string,
+  imageId: string,
+  userId: string
+): Promise<IMenuItem> => {
+  const item = await MenuItemModel.findOne({ _id: menuItemId, organizationId });
+  if (!item) throw new ApiError(404, 'Menu item not found');
+
+  const current = (item.images ?? []) as (IUpload & { _id: Types.ObjectId })[];
+  const target = current.find((img) => String(img._id) === imageId);
+  if (!target) throw new ApiError(404, 'Image not found');
+
+  item.images = current.filter((img) => String(img._id) !== imageId) as IUpload[];
+  item.updatedBy = userId as unknown as Types.ObjectId;
+  await item.save();
+
+  // Best effort: the record is already gone, so a failed S3 delete shouldn't fail the request
+  // try {
+  //   if (target.key) await deleteFileFromS3(target.key);
+  // } catch (err) {
+  //   console.error('Failed to delete menu item image from S3:', err);
+  // }
+
   return item;
 };
 

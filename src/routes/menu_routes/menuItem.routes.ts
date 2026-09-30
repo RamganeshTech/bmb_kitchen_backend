@@ -3,6 +3,8 @@ import { Router } from "express";
 import * as menuItemController from "../../controllers/menu_items/menuItem.controller.js";
 
 import { multiAuthRole } from "../../middleware/auth.middleware.js";
+import { MAX_MENU_ITEM_IMAGES } from "../../controllers/menu_items/menuItem.services.js";
+import { upload } from "../../utils/s3Upload.js";
 
 const menuItemRoutes = Router();
 
@@ -26,7 +28,25 @@ menuItemRoutes.get(
 menuItemRoutes.post(
   "/v1/:organizationId",
   multiAuthRole("owner", "admin", "cto"), // Usually staff shouldn't create items, adjust as needed
+    upload.array("files", MAX_MENU_ITEM_IMAGES),
   menuItemController.createMenuItem
+);
+
+
+
+// POST /api/menu-item/v1/:organizationId/:menuItemId/images (add extra images)
+menuItemRoutes.post(
+  "/v1/:organizationId/:menuItemId/images",
+  multiAuthRole("owner", "admin", "cto"),
+  upload.array("files", MAX_MENU_ITEM_IMAGES),
+  menuItemController.addMenuItemImages
+);
+
+// DELETE /api/menu-item/v1/:organizationId/:menuItemId/images/:imageId (remove one image)
+menuItemRoutes.delete(
+  "/v1/:organizationId/:menuItemId/images/:imageId",
+  multiAuthRole("owner", "admin", "cto"),
+  menuItemController.removeMenuItemImage
 );
 
 // GET /api/menu-item/v1/:organizationId (Get All Active)
