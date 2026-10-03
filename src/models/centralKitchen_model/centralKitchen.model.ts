@@ -20,7 +20,7 @@ export interface ICentralKitchenTransfer extends Document {
 
 const TransferLineSchema = new Schema<ITransferLine>(
   {
-    inventoryId: { type: Schema.Types.ObjectId, ref: 'InventoryModel', required: true },
+    inventoryId: { type: Schema.Types.ObjectId, ref: 'Inventory', required: true },
     quantity: { type: Number, required: true },
   },
   { _id: true }

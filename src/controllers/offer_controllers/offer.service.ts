@@ -33,8 +33,8 @@ export const getOfferList = async (
   organizationId: string | Types.ObjectId
 ): Promise<IOffer[]> => {
   const offers = await OfferModel.find({ organizationId, isActive: true })
-    .populate('categoryIds', 'name')
-    .populate('menuItemIds', 'name')
+    .populate('categoryIds', 'name _id')
+    .populate('menuItemIds', 'name _id')
     .sort({ createdAt: -1 });
 
   return offers;
@@ -45,8 +45,8 @@ export const getInactiveOfferList = async (
   organizationId: string | Types.ObjectId
 ): Promise<IOffer[]> => {
   const offers = await OfferModel.find({ organizationId, isActive: false })
-    .populate('categoryIds', 'name')
-    .populate('menuItemIds', 'name')
+    .populate('categoryIds', 'name _id')
+    .populate('menuItemIds', 'name _id')
     .sort({ updatedAt: -1 });
 
   return offers;
@@ -70,8 +70,8 @@ export const getOfferById = async (
   offerId: string | Types.ObjectId
 ): Promise<IOffer> => {
   const offer = await OfferModel.findOne({ _id: offerId, organizationId })
-    .populate('categoryIds', 'name')
-    .populate('menuItemIds', 'name');
+    .populate('categoryIds', 'name _id')
+    .populate('menuItemIds', 'name _id');
 
   if (!offer) {
     throw new ApiError(404, 'Offer not found');

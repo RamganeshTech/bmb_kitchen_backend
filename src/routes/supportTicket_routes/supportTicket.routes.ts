@@ -42,7 +42,7 @@ supportTicketRoutes.get(
 
 // PATCH /api/support-ticket/v1/:organizationId/:id/advance
 supportTicketRoutes.patch(
-  '/v1/:organizationId/:id/advance',
+  '/v1/:organizationId/:id/status',
   multiAuthRole('owner', 'admin', 'cto'), // matches the HTML — cycleTicket has no visible staff restriction, but progressing/closing support issues fits management
   supportTicketController.advanceTicketStatus
 );

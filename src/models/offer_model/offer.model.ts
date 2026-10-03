@@ -64,12 +64,12 @@ const offerSchema = new Schema<IOffer>(
     },
     categoryIds: {
       type: [Schema.Types.ObjectId],
-      ref: 'MenuCategoryModel',
+      ref: 'MenuCategory',
       default: [],
     },
     menuItemIds: {
       type: [Schema.Types.ObjectId],
-      ref: 'MenuItemModel',
+      ref: 'MenuItem',
       default: [],
     },
     minOrderAmount: {

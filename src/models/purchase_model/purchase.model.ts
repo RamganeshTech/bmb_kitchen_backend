@@ -27,7 +27,7 @@ const purchaseItemSchema = new Schema<IPurchaseItem>(
   {
     inventoryId: {
       type: Schema.Types.ObjectId,
-      ref: 'InventoryModel',
+      ref: 'Inventory',
       required: true,
     },
     quantity: {

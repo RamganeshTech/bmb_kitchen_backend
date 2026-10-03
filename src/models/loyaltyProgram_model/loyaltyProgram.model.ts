@@ -1,9 +1,13 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
 export interface ILoyaltyTier {
+  _id?: Types.ObjectId;
   name: string;
-  minLifetimeSpend: number;
+  minPoints: number;
+  multiplier?: number;
+  benefits: string[];
 }
+
 
 export interface ILoyaltyProgram extends Document {
   organizationId: Types.ObjectId;
@@ -21,17 +25,33 @@ export interface ILoyaltyProgram extends Document {
   updatedAt: Date;
 }
 
+
+
+
 const loyaltyTierSchema = new Schema<ILoyaltyTier>(
   {
     name: {
       type: String,
-      required: true,
+      required: [true, 'Tier name is required'],
       trim: true,
     },
-    minLifetimeSpend: {
+    minPoints: {
       type: Number,
-      required: true,
-      min: 0,
+      // required: [true, 'Minimum points is required'],
+      // min: [0, 'Minimum points cannot be negative'],
+      // validate: {
+      //   validator: Number.isInteger,
+      //   message: 'Minimum points must be a whole number',
+      // },
+    },
+    multiplier: {
+      type: Number,
+      // min: [0.01, 'Multiplier must be greater than 0'],
+      default: undefined, // optional: the form deletes it when empty
+    },
+    benefits: {
+      type: [{ type: String, trim: true }],
+      default: [],
     },
   },
   { _id: true }
@@ -76,9 +96,9 @@ const loyaltyProgramSchema = new Schema<ILoyaltyProgram>(
     tiers: {
       type: [loyaltyTierSchema],
       default: [
-        { name: 'Silver', minLifetimeSpend: 0 },
-        { name: 'Gold', minLifetimeSpend: 5000 },
-        { name: 'Platinum', minLifetimeSpend: 15000 },
+        { name: 'Silver', minPoints: 0, multiplier: 1, benefits: [] },
+        { name: 'Gold', minPoints: 500, multiplier: 1.5, benefits: [] },
+        { name: 'Platinum', minPoints: 1500, multiplier: 2, benefits: [] },
       ],
     },
     isActive: {

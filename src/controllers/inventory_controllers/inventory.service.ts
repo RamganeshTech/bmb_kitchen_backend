@@ -58,10 +58,10 @@ export const getInactiveInventoryList = async (
 // ── DROPDOWN (material, rate, _id only — active items) ───────────
 export const getInventoryDropdown = async (
   organizationId: string | Types.ObjectId
-): Promise<Pick<IInventory, 'material' | 'rate'>[]> => {
+): Promise<Pick<IInventory, 'material' | 'rate' | 'unit'>[]> => {
   const items = await InventoryModel.find(
     { organizationId, isActive: true },
-    { material: 1, rate: 1 }
+    { material: 1, rate: 1, unit: 1 }
   ).sort({ material: 1 });
 
   return items;

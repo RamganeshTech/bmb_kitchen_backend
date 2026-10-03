@@ -29,7 +29,7 @@ const wastageAdjustmentSchema = new Schema<IWastageAdjustment>(
     },
     inventoryId: {
       type: Schema.Types.ObjectId,
-      ref: 'InventoryModel',
+      ref: 'Inventory',
       required: true,
     },
     type: {

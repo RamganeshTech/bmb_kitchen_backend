@@ -35,6 +35,7 @@ import dashboardRoutes from './routes/dashboard_routes/dashboard.routes.js';
 import notificationSettingsRoutes from './routes/notification_routes/notificationSetting.routes.js';
 import notificationRoutes from './routes/notification_routes/notification.routes.js';
 import integrationRoutes from './routes/integration_routes/integration.routes.js';
+import customerRoutes from './routes/customer_routes/customer.routes.js';
 
 // Load environment variables
 dotenv.config({ path: '.env' });
@@ -88,6 +89,7 @@ app.use("/api/menu-category", menuCategoryRoutes);
 app.use("/api/menu-item", menuItemRoutes);
 app.use("/api/table", restaurantTableRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/customer", customerRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/purchase", purchaseRoutes);
 app.use("/api/recipe-cost", recipeCostRoutes);

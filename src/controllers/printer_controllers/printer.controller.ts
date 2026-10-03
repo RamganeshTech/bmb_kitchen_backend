@@ -90,7 +90,7 @@ export const updatePrinter = async (req: RoleBasedRequest, res: Response, next: 
       return res.status(400).json({ ok: false, message: 'id is required' });
     }
 
-    const { name, type, printerModel, conn, size, copies, categories } = req.body;
+    const { name, type, printerModel, conn, size, copies, categories, outletId } = req.body;
     const printer = await printerService.updatePrinter(organizationId, userId, id, {
       name,
       type,
@@ -99,6 +99,7 @@ export const updatePrinter = async (req: RoleBasedRequest, res: Response, next: 
       size,
       copies,
       categories,
+      outletId
     });
 
     return res.status(200).json({ ok: true, data: printer });

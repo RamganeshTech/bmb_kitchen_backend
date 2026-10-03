@@ -26,7 +26,7 @@ const recipeIngredientSchema = new Schema<IRecipeIngredient>(
   {
     inventoryId: {
       type: Schema.Types.ObjectId,
-      ref: 'InventoryModel',
+      ref: 'Inventory',
       required: true,
     },
     unit: {
@@ -59,7 +59,7 @@ const recipeCostSchema = new Schema<IRecipeCost>(
     },
     menuItemId: {
       type: Schema.Types.ObjectId,
-      ref: 'MenuItemModel',
+      ref: 'MenuItem',
       required: true,
     },
     ingredients: {

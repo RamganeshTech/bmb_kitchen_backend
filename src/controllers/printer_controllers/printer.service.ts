@@ -13,6 +13,7 @@ interface CreatePrinterInput {
 }
 
 interface UpdatePrinterInput {
+  outletId?: string;
   name?: string;
   type?: 'Bill' | 'KOT';
   printerModel?: string;

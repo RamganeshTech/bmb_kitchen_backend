@@ -64,7 +64,7 @@ const orderItemSchema = new Schema<IOrderItem>(
   {
     menuItemId: {
       type: Schema.Types.ObjectId,
-      ref: 'MenuItemModel',
+      ref: 'MenuItem',
       required: [true, 'Menu Item ID is required'],
     },
     name: {

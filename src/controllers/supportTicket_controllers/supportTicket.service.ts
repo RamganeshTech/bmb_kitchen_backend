@@ -9,11 +9,11 @@ interface CreateTicketInput {
   details?: string;
 }
 
-const STATUS_CYCLE: Record<string, string> = {
-  Open: 'In progress',
-  'In progress': 'Closed',
-  Closed: 'Open',
-};
+// const STATUS_CYCLE: Record<string, string> = {
+//   Open: 'In progress',
+//   'In progress': 'Closed',
+//   Closed: 'Closed',
+// };
 
 export const createTicket = async (
   organizationId: string,
@@ -72,11 +72,20 @@ export const listInactiveTickets = async (organizationId: string) => {
 };
 
 // Mirrors the HTML's cycleTicket: Open → In progress → Closed → Open
-export const advanceTicketStatus = async (organizationId: string, userId: string, id: string) => {
+export const advanceTicketStatus = async (organizationId: string, userId: string, id: string, status: string) => {
+
+  const allowedStatuses = ['Open', 'In progress', 'Closed'];
+
+  if (!allowedStatuses.includes(status)) {
+    throw new ApiError(400, 'Invalid ticket status');
+  }
+
   const ticket = await SupportTicketModel.findOne({ _id: id, organizationId, isActive: true });
   if (!ticket) throw new ApiError(404, 'Ticket not found');
 
-  ticket.status = STATUS_CYCLE[ticket.status] as typeof ticket.status;
+  // ticket.status = STATUS_CYCLE[ticket.status] as typeof ticket.status;
+    ticket.status = status as typeof ticket.status;
+
   ticket.updatedBy = userId as any;
   await ticket.save();
 

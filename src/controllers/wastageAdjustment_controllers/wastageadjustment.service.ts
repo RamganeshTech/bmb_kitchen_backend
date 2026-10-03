@@ -74,7 +74,7 @@ export const getWastageAdjustmentList = async (
   organizationId: string | Types.ObjectId
 ): Promise<IWastageAdjustment[]> => {
   const entries = await WastageAdjustmentModel.find({ organizationId, isActive: true })
-    .populate('inventoryId', 'material unit rate')
+    .populate('inventoryId', 'material unit rate _id')
     .sort({ createdAt: -1 });
 
   return entries;
@@ -85,7 +85,7 @@ export const getInactiveWastageAdjustmentList = async (
   organizationId: string | Types.ObjectId
 ): Promise<IWastageAdjustment[]> => {
   const entries = await WastageAdjustmentModel.find({ organizationId, isActive: false })
-    .populate('inventoryId', 'material unit rate')
+    .populate('inventoryId', 'material unit rate _id')
     .sort({ updatedAt: -1 });
 
   return entries;
@@ -99,7 +99,7 @@ export const getWastageAdjustmentById = async (
   const entry = await WastageAdjustmentModel.findOne({
     _id: wastageAdjustmentId,
     organizationId,
-  }).populate('inventoryId', 'material unit rate');
+  }).populate('inventoryId', 'material unit rate _id');
 
   if (!entry) {
     throw new ApiError(404, 'Wastage/Adjustment entry not found');
@@ -108,28 +108,75 @@ export const getWastageAdjustmentById = async (
   return entry;
 };
 
-// ── UPDATE ────────────────────────────────────────────────────────
-// Note: only updates type/reason. It does NOT re-adjust inventory stock —
-// changing the quantity after the fact needs an explicit reversal +
-// re-apply flow, not a plain field update.
+// ── UPDATE (transactional: entry changes + inventory stock difference) ─
+// Changing the quantity applies only the difference to inventory stock.
+// e.g. wastage 5 -> 8 reduces stock by 3 more; 5 -> 2 gives 3 back.
 export const updateWastageAdjustment = async (
   organizationId: string | Types.ObjectId,
   wastageAdjustmentId: string | Types.ObjectId,
   userId: string | Types.ObjectId,
-  data: Partial<Pick<IWastageAdjustment, 'type' | 'reason'>>
+  data: Partial<Pick<IWastageAdjustment, 'type' | 'reason' | 'quantity'>>
 ): Promise<IWastageAdjustment> => {
-  const entry = await WastageAdjustmentModel.findOneAndUpdate(
-    { _id: wastageAdjustmentId, organizationId },
-    { ...data, updatedBy: userId },
-    { new: true, runValidators: true }
-  );
+  const session = await mongoose.startSession();
 
-  if (!entry) {
-    throw new ApiError(404, 'Wastage/Adjustment entry not found');
+  try {
+    let updated!: IWastageAdjustment;
+
+    await session.withTransaction(async () => {
+      const entry = await WastageAdjustmentModel.findOne({
+        _id: wastageAdjustmentId,
+        organizationId,
+      }).session(session);
+
+      if (!entry) {
+        throw new ApiError(404, 'Wastage/Adjustment entry not found');
+      }
+
+      const { type, reason, quantity } = data;
+
+      if (quantity !== undefined && quantity !== entry.quantity) {
+        const inventoryItem = await InventoryModel.findOne({
+          _id: entry.inventoryId,
+          organizationId,
+        }).session(session);
+
+        if (!inventoryItem) {
+          throw new ApiError(404, 'Inventory item not found');
+        }
+
+        // Entries logged by "adjust stock -> add" increased stock; everything else reduced it
+        const isAddition =
+          (entry as IWastageAdjustment & { action?: 'add' | 'remove' }).action === 'add';
+
+        const delta = quantity - entry.quantity;
+        const stockChange = isAddition ? delta : -delta;
+        const newStock = inventoryItem.inStock + stockChange;
+
+        if (newStock < 0) {
+          throw new ApiError(400, 'Quantity exceeds current stock on hand');
+        }
+
+        inventoryItem.inStock = newStock;
+        inventoryItem.value = inventoryItem.inStock * inventoryItem.rate;
+        await inventoryItem.save({ session });
+
+        entry.quantity = quantity;
+      }
+
+      if (type !== undefined) entry.type = type;
+      if (reason !== undefined) entry.reason = reason;
+      entry.updatedBy = userId as unknown as Types.ObjectId;
+
+      await entry.save({ session });
+      updated = entry;
+    });
+
+    return updated;
+  } finally {
+    session.endSession();
   }
-
-  return entry;
 };
+
 
 // ── SOFT DELETE (isActive: false) ─────────────────────────────────
 export const softDeleteWastageAdjustment = async (

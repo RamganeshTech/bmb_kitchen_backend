@@ -85,6 +85,7 @@ export const advanceTicketStatus = async (req: RoleBasedRequest, res: Response, 
   try {
     const { organizationId, id } = req.params;
     const userId = req.user!.userId;
+    const {status} = req.body;
     if (!organizationId) {
       return res.status(400).json({ ok: false, message: 'organizationId is required' });
     }
@@ -92,7 +93,14 @@ export const advanceTicketStatus = async (req: RoleBasedRequest, res: Response, 
       return res.status(400).json({ ok: false, message: 'id is required' });
     }
 
-    const ticket = await supportTicketService.advanceTicketStatus(organizationId, userId, id);
+      if (!status) {
+      return res.status(400).json({
+        ok: false,
+        message: 'status is required',
+      });
+    }
+
+    const ticket = await supportTicketService.advanceTicketStatus(organizationId, userId, id, status);
     return res.status(200).json({ ok: true, data: ticket });
   } catch (error) {
     next(error);

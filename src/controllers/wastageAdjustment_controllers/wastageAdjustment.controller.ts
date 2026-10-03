@@ -125,7 +125,7 @@ export const updateWastageAdjustment = async (
   try {
     const { organizationId, wastageAdjustmentId } = req.params;
     const userId = req.user!.userId;
-    const { type, reason } = req.body;
+    const { type, reason, quantity } = req.body;
 
     if (!organizationId || !wastageAdjustmentId) {
       res
@@ -138,7 +138,7 @@ export const updateWastageAdjustment = async (
       organizationId,
       wastageAdjustmentId,
       userId,
-      { type, reason }
+      { type, reason, quantity }
     );
 
     res.status(200).json({ ok: true, data: entry });
