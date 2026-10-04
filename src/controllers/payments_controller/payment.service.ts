@@ -1,5 +1,6 @@
 import OrderModel, { OrderType, PaymentMethod } from "../../models/order_models/order.model.js";
 import { ApiError } from "../../utils/apiError.js";
+import {Types} from "mongoose"
 
 interface ListPaymentsFilters {
   outletId?: string;
@@ -52,17 +53,24 @@ export const listPayments = async (organizationId: string, filters: ListPayments
   const limit = filters.limit && filters.limit > 0 ? Math.min(filters.limit, 200) : 200;
   const skip = (page - 1) * limit;
 
+
+  const aggregateMatch = {
+    ...query,
+    organizationId: new Types.ObjectId(organizationId),
+    ...(filters.outletId && { outletId: new Types.ObjectId(filters.outletId) }),
+  };
+
   const [payments, total, summaryAgg] = await Promise.all([
     OrderModel.find(query)
       .select('billNo orderNo orderType outletId tableId customerId grandTotal taxAmount discountAmount paymentMethod paidAt')
-      .populate('outletId', 'name code')
-      .populate('customerId', 'name phone')
+      .populate('outletId', '_id name code')
+      .populate('customerId', '_id name phone')
       .sort({ paidAt: -1 })
       .skip(skip)
       .limit(limit),
     OrderModel.countDocuments(query),
     OrderModel.aggregate([
-      { $match: query },
+      { $match: aggregateMatch },
       {
         $group: {
           _id: '$paymentMethod',
@@ -97,9 +105,9 @@ export const getPaymentById = async (organizationId: string, orderId: string) =>
     paymentStatus: 'paid',
   })
     .select('billNo orderNo orderType outletId tableId customerId items subTotal discountAmount taxPercent taxAmount grandTotal loyaltyPointsRedeemed paymentMethod paidAt')
-    .populate('outletId', 'name code')
-    .populate('customerId', 'name phone')
-    .populate('tableId', 'name');
+    .populate('outletId', '_id name code')
+    .populate('customerId', '_id name phone')
+    .populate('tableId', '_id name');
 
   if (!payment) throw new ApiError(404, 'Payment not found for this order');
   return payment;
