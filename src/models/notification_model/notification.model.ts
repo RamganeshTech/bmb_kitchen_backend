@@ -19,6 +19,8 @@ export interface INotification extends Document {
   relatedEntityId: Types.ObjectId | null;
   readBy: Types.ObjectId[]; // presence of a userId here = hidden/read for that user only
   createdBy: Types.ObjectId | null;
+   createdAt: Date;
+    updatedAt: Date;
 }
 
 const NotificationSchema = new Schema<INotification>(

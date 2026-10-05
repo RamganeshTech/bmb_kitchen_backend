@@ -1,8 +1,11 @@
 import { Schema, model, Document, Types } from 'mongoose';
+import { IUpload } from '../user_models/user.model.js';
 
 export interface IMenuCategory extends Document {
   organizationId: Types.ObjectId;
   menuCategoryNo: string;
+  image: IUpload | null;
+
   name: string;
   description?: string;
   isActive: boolean;
@@ -11,6 +14,16 @@ export interface IMenuCategory extends Document {
   createdAt: Date;
   updatedAt: Date;
 }
+
+
+const uploadSchema = new Schema<IUpload>({
+  type: { type: String, enum: ["image"] },
+  key: { type: String, },
+  url: { type: String, },
+  originalName: String,
+  uploadedAt: { type: Date, default: Date.now }
+});
+
 
 const menuCategorySchema = new Schema<IMenuCategory>(
   {
@@ -21,6 +34,7 @@ const menuCategorySchema = new Schema<IMenuCategory>(
       index: true,
     },
     menuCategoryNo: {type: String,trim: true},
+    image: { type: uploadSchema, default: null },
     name: {
       type: String,
       required: [true, 'Category name is required'],

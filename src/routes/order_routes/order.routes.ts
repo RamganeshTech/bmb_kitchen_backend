@@ -66,4 +66,14 @@ orderRoutes.get(
 
 
 
+//  KTUCEN ROUTES
+
+
+orderRoutes.get(
+  '/v1/:organizationId/kitchen',
+  multiAuthRole('owner', 'admin', 'cto', "staff"), // Staff usually cannot cancel entire orders, requires Admin/CTO/Owner
+  orderController.getKitchenItems
+);
+
+
 export default orderRoutes;

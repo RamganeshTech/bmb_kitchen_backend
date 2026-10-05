@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { register, login, getMe, logout, resetPassword, userAuthenticated, updateUserPermissions } from "../../controllers/user_controllers/auth.controller.js";
+import { register, login, getMe, logout, resetPassword, userAuthenticated, updateUserPermissions, updateUserData, getSingleUser } from "../../controllers/user_controllers/auth.controller.js";
 import { multiAuthRole } from "../../middleware/auth.middleware.js";
 import { forgotPassword, getAllUsers , updateProfileImage} from "../../controllers/user_controllers/auth.controller.js";
 import { upload } from "../../utils/s3Upload.js";
@@ -17,8 +17,14 @@ userRoutes.get("/v1/isauthenticated", multiAuthRole(), userAuthenticated);
 userRoutes.get("/v1/me", multiAuthRole(), getMe);
 userRoutes.post("/v1/logout", multiAuthRole(), logout);
 userRoutes.post("/v1/update-permissions", multiAuthRole("owner", "cto", "admin"), updateUserPermissions);
+userRoutes.put("/v1/update", multiAuthRole("owner", "cto", "admin", "staff"), updateUserData);
 
 
+userRoutes.get(
+  "/v1/:userId",
+  multiAuthRole("owner", "cto", "admin", "staff"),
+  getSingleUser
+);
 
 userRoutes.put(
   "/v1/:organizationId/:userId/profile-image",

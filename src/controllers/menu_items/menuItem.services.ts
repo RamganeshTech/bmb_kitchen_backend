@@ -7,7 +7,7 @@ import { IUpload } from '../../models/user_models/user.model.js';
 
 export const MAX_MENU_ITEM_IMAGES = 5;
 
-const assertImages = (files: Express.Multer.File[]) => {
+export const assertImages = (files: Express.Multer.File[]) => {
   for (const file of files) {
     if (!file.mimetype.startsWith('image/')) {
       throw new ApiError(400, `Only image files are allowed (${file.originalname})`);

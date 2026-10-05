@@ -1,6 +1,7 @@
 import { Router } from "express";
 import * as menuCategoryController from "../../controllers/menu_category/menuCategory.controller.js";
 import { multiAuthRole } from "../../middleware/auth.middleware.js";
+import { upload } from "../../utils/s3Upload.js";
 
 const menuCategoryRoutes = Router();
 
@@ -24,6 +25,7 @@ menuCategoryRoutes.get(
 menuCategoryRoutes.post(
   "/v1/:organizationId",
   multiAuthRole("owner", "admin", "cto", "staff"),
+  upload.single("file"),
   menuCategoryController.createMenuCategory
 );
 
@@ -40,6 +42,23 @@ menuCategoryRoutes.patch(
   "/v1/:organizationId/:id/recover",
   multiAuthRole("owner", "admin", "cto", "staff"),
   menuCategoryController.recoverMenuCategory
+);
+
+
+
+// update (replace) picture
+menuCategoryRoutes.patch(
+  "/v1/:organizationId/:categoryId/image",
+  multiAuthRole("owner", "admin", "cto", "staff"),
+  upload.single("file"),
+  menuCategoryController.updateMenuCategoryImage
+);
+
+// remove picture
+menuCategoryRoutes.delete(
+  "/v1/:organizationId/:categoryId/image",
+  multiAuthRole("owner", "admin", "cto", "staff"),
+  menuCategoryController.removeMenuCategoryImage
 );
 
 // GET /api/menu-category/v1/:organizationId/:id (Get Single by ID)

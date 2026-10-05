@@ -65,6 +65,84 @@ export const listNotificationsByOutlet = async (
   }));
 };
 
+
+export interface ListNotificationFilters {
+  outletId?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedNotificationsResult {
+  items: Array<{
+    _id: Types.ObjectId;
+    organizationId: Types.ObjectId;
+    outletId: Types.ObjectId | null;
+    eventKey: string;
+    title: string;
+    message: string;
+    relatedEntityType: string | null;
+    relatedEntityId: Types.ObjectId | null;
+    createdBy: Types.ObjectId | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+}
+
+export const listAllNotifications = async (
+  organizationId: string,
+  userId: string,
+  filters: ListNotificationFilters = {}
+): Promise<PaginatedNotificationsResult> => {
+  const page = Math.max(1, Number(filters.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(filters.limit) || 20));
+  const skip = (page - 1) * limit;
+
+  // Base query:
+  // 1. Belongs to the organization
+  // 2. Strict exclusion: user is NOT in the readBy array
+  const query: Record<string, any> = {
+    organizationId: new Types.ObjectId(organizationId),
+    readBy: { $ne: new Types.ObjectId(userId) },
+  };
+
+  // Optional outlet filter: includes matching outlet notifications + org-wide ones (outletId: null)
+  if (filters.outletId) {
+    query.$or = [{ outletId: new Types.ObjectId(filters.outletId) }, { outletId: null }];
+  }
+
+  const [items, total] = await Promise.all([
+    NotificationModel.find(query)
+      .select('-readBy')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    NotificationModel.countDocuments(query),
+  ]);
+
+  const totalPages = Math.ceil(total / limit) || 1;
+
+  return {
+    items,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1,
+    },
+  };
+};
+
 // ── GET A SINGLE NOTIFICATION ───────────────────────────────────────
 export const getNotificationById = async (organizationId: string, id: string, userId: string) => {
   const notification = await NotificationModel.findOne({ _id: id, organizationId }).lean();

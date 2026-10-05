@@ -53,17 +53,6 @@ export const registerUser = async (
 };
 
 
-export const getByUserId = async (userId: string): Promise<{ user: IUser }> => {
-
-    const user = await UserModel.findById(userId).populate("organizationId", "_id name logo").select("-password")
-
-    if (!user) {
-        throw new ApiError(401, "Invalid email or password");
-    }
-
-    return { user: user }
-}
-
 export const loginUser = async (
     email: string,
     password: string
@@ -143,6 +132,19 @@ export const resetPassword = async (
 
 
 
+
+export const getByUserId = async (userId: string): Promise<{ user: IUser }> => {
+
+    const user = await UserModel.findById(userId).populate("organizationId", "_id name logo").select("-password")
+
+    if (!user) {
+        throw new ApiError(401, "Invalid email or password");
+    }
+
+    return { user: user }
+}
+
+
 export interface UserFilters {
     email?: string;
     phoneNo?: string;
@@ -182,6 +184,62 @@ export const getAllUsers = async (
     ]);
 
     return { users, total, page, limit };
+};
+
+
+
+export interface UpdateUserDataInput {
+  email?: string;
+  userName?: string;
+  phoneNo?: string;
+}
+
+export const updateUserData = async (userId: string, input: UpdateUserDataInput) => {
+  // Whitelist: strictly extract and sanitize only the permitted fields
+  const updatePayload: Record<string, string> = {};
+
+  if (typeof input.userName === 'string') {
+    const trimmed = input.userName.trim();
+    if (!trimmed) {
+      throw new ApiError(400, 'User name cannot be empty');
+    }
+    updatePayload.userName = trimmed;
+  }
+
+  if (typeof input.email === 'string') {
+    const trimmed = input.email.trim().toLowerCase();
+    // Check for email collision if changed and not empty
+    if (trimmed) {
+      const existingUser = await UserModel.findOne({
+        email: trimmed,
+        _id: { $ne: userId },
+      });
+      if (existingUser) {
+        throw new ApiError(409, 'Email is already in use by another account');
+      }
+    }
+    updatePayload.email = trimmed;
+  }
+
+  if (typeof input.phoneNo === 'string') {
+    updatePayload.phoneNo = input.phoneNo.trim();
+  }
+
+  if (Object.keys(updatePayload).length === 0) {
+    throw new ApiError(400, 'No valid fields provided for update');
+  }
+
+  const updatedUser = await UserModel.findByIdAndUpdate(
+    userId,
+    { $set: updatePayload },
+    { new: true, runValidators: true }
+  ).select('-password');
+
+  if (!updatedUser) {
+    throw new ApiError(404, 'User not found');
+  }
+
+  return updatedUser;
 };
 
 export const updateUserPermissions = async (

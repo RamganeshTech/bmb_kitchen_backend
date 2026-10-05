@@ -11,6 +11,8 @@ export const createMenuCategory = async (
     const { organizationId } = req.params as { organizationId: string };
     const { name, description } = req.body;
     const userId = req.user!.userId;
+    const file = req.file;
+
 
     if (!organizationId) {
       res.status(400).json({ ok: false, message: 'Organization ID is required' });
@@ -25,9 +27,60 @@ export const createMenuCategory = async (
     const category = await menuCategoryService.createMenuCategory(organizationId, userId, {
       name,
       description,
-    });
+    }, file);
 
     res.status(201).json({ ok: true, data: category });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+// ── UPDATE PICTURE ────────────────────────────────────────────────
+export const updateMenuCategoryImage = async (
+  req: RoleBasedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { organizationId, categoryId } = req.params as { organizationId: string; categoryId: string };
+    const userId = req.user!.userId;
+    const file = req.file;
+
+    if (!organizationId || !categoryId) {
+      res.status(400).json({ ok: false, message: 'Organization ID and Category ID are required' });
+      return;
+    }
+    if (!file) {
+      res.status(400).json({ ok: false, message: 'An image file is required' });
+      return;
+    }
+
+    const category = await menuCategoryService.updateMenuCategoryImage(organizationId, categoryId, userId, file);
+    res.status(200).json({ ok: true, message: 'Image updated', data: category });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ── REMOVE PICTURE ────────────────────────────────────────────────
+export const removeMenuCategoryImage = async (
+  req: RoleBasedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { organizationId, categoryId } = req.params as { organizationId: string; categoryId: string };
+    const userId = req.user!.userId;
+
+    if (!organizationId || !categoryId) {
+      res.status(400).json({ ok: false, message: 'Organization ID and Category ID are required' });
+      return;
+    }
+
+    const category = await menuCategoryService.removeMenuCategoryImage(organizationId, categoryId, userId);
+    res.status(200).json({ ok: true, message: 'Image removed', data: category });
   } catch (error) {
     next(error);
   }
@@ -47,7 +100,7 @@ export const getActiveMenuCategories = async (
     }
 
     const categories = await menuCategoryService.getAllActiveMenuCategories(organizationId);
-    
+
     res.status(200).json({ ok: true, data: categories });
   } catch (error) {
     next(error);
@@ -68,7 +121,7 @@ export const getInactiveMenuCategories = async (
     }
 
     const categories = await menuCategoryService.getAllInactiveMenuCategories(organizationId);
-    
+
     res.status(200).json({ ok: true, data: categories });
   } catch (error) {
     next(error);
@@ -112,7 +165,7 @@ export const getMenuCategoryById = async (
     }
 
     const category = await menuCategoryService.getMenuCategoryById(organizationId, id);
-    
+
     res.status(200).json({ ok: true, data: category });
   } catch (error) {
     next(error);
@@ -162,7 +215,7 @@ export const softDeleteMenuCategory = async (
     }
 
     await menuCategoryService.softDeleteMenuCategory(organizationId, id, userId);
-    
+
     res.status(200).json({ ok: true, message: 'Menu category deactivated successfully' });
   } catch (error) {
     next(error);
@@ -184,7 +237,7 @@ export const recoverMenuCategory = async (
     }
 
     await menuCategoryService.recoverMenuCategory(organizationId, id, userId);
-    
+
     res.status(200).json({ ok: true, message: 'Menu category recovered successfully' });
   } catch (error) {
     next(error);
@@ -205,7 +258,7 @@ export const hardDeleteMenuCategory = async (
     }
 
     await menuCategoryService.hardDeleteMenuCategory(organizationId, id);
-    
+
     res.status(200).json({ ok: true, message: 'Menu category permanently deleted' });
   } catch (error) {
     next(error);

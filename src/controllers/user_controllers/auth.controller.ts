@@ -211,6 +211,60 @@ export const resetPassword = async (
 };
 
 
+export const updateUserData = async (
+  req: RoleBasedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ ok: false, message: 'Unauthorized: User ID missing' });
+    }
+
+    // Explicitly destructure only allowed fields from body
+    const { email, userName, phoneNo } = req.body;
+
+    const updatedUser = await authService.updateUserData(userId, {
+      email,
+      userName,
+      phoneNo,
+    });
+
+    return res.status(200).json({
+      ok: true,
+      message: 'User profile updated successfully',
+      data: updatedUser,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getSingleUser = async (
+  req: RoleBasedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({ ok: false, message: "User ID is required" });
+    }
+
+    const user = await authService.getByUserId(userId);
+    
+
+    return res.status(200).json({
+      ok: true,
+      data: user?.user || null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 export const updateProfileImage = async (
   req: RoleBasedRequest,

@@ -2,6 +2,7 @@ import type { Response, NextFunction } from 'express';
 import { Types } from 'mongoose';
 import * as orderService from './order.services.js';
 import type { RoleBasedRequest } from '../../utils/utils.js';
+import { IOrder, ItemKitchenStatus } from '../../models/order_models/order.model.js';
 
 // ── 1. PLACE NEW ORDER (Start) ────────────────────────────────────
 export const placeNewOrder = async (
@@ -267,6 +268,62 @@ export const listOrdersByType = async (req: RoleBasedRequest, res: Response, nex
     });
 
     return res.status(200).json({ ok: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+//  KITCHEN STATUS
+
+
+// ── KITCHEN BOARD ─────────────────────────────────────────────────
+export const getKitchenItems = async (
+  req: RoleBasedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { organizationId } = req.params;
+    const { outletId, status, orderType, scope, page, limit } = req.query;
+
+    if (!organizationId || !Types.ObjectId.isValid(organizationId)) {
+      res.status(400).json({ ok: false, message: 'A valid Organization ID is required' });
+      return;
+    }
+
+    if (outletId && !Types.ObjectId.isValid(String(outletId))) {
+      res.status(400).json({ ok: false, message: 'A valid outlet ID is required' });
+      return;
+    }
+
+    // status can be "preparing" or "in_queue,preparing"
+    const statuses = status
+      ? String(status).split(',').map((s) => s.trim()).filter(Boolean)
+      : undefined;
+
+    const validStatuses = ['in_queue', 'preparing', 'ready', 'served', 'cancelled'];
+    if (statuses && statuses.some((s) => !validStatuses.includes(s))) {
+      res.status(400).json({ ok: false, message: `status must be one of: ${validStatuses.join(', ')}` });
+      return;
+    }
+
+    if (scope && !['running', 'today'].includes(String(scope))) {
+      res.status(400).json({ ok: false, message: 'scope must be running or today' });
+      return;
+    }
+
+    const data = await orderService.listKitchenItems(organizationId, {
+      outletId: outletId ? String(outletId) : undefined,
+      statuses: statuses as ItemKitchenStatus[] | undefined,
+      orderType: orderType ? (String(orderType) as IOrder['orderType']) : undefined,
+      scope: scope as 'running' | 'today' | undefined,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+
+    res.status(200).json({ ok: true, data });
   } catch (error) {
     next(error);
   }

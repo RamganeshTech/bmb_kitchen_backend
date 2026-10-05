@@ -104,6 +104,7 @@ export const getItemSalesReport = async (organizationId: string, filters: BaseFi
   const items = await OrderModel.aggregate([
     { $match: match },
     { $unwind: '$items' },
+    { $match: { 'items.status': { $ne: 'cancelled' } } },
     {
       $group: {
         _id: '$items.menuItemId',

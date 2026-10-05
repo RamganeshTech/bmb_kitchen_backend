@@ -1,4 +1,4 @@
-import mongoose, { type Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import OrderModel, { OrderStatus, OrderType, PaymentStatus, type IOrder, type IOrderItem, type ItemKitchenStatus } from '../../models/order_models/order.model.js';
 import CustomerModel from '../../models/customer_models/customer.model.js';
 import { ApiError } from '../../utils/apiError.js';
@@ -585,4 +585,115 @@ export const listOrdersByType = async (
   ]);
 
   return { orders, total, page, limit };
+};
+
+
+
+
+//  kithen status 
+
+
+
+const KITCHEN_STATUSES: ItemKitchenStatus[] = ['in_queue', 'preparing', 'ready', 'served', 'cancelled'];
+const KITCHEN_BOARD_DEFAULT: ItemKitchenStatus[] = ['in_queue', 'preparing', 'ready'];
+
+// ── KITCHEN BOARD (item-level KOT view) ───────────────────────────
+export const listKitchenItems = async (
+  organizationId: string | Types.ObjectId,
+  filters: {
+    outletId?: string;
+    statuses?: ItemKitchenStatus[];
+    orderType?: IOrder['orderType'];
+    scope?: 'running' | 'today';
+    page?: number;
+    limit?: number;
+  }
+) => {
+  const page = Math.max(filters.page ?? 1, 1);
+  const limit = Math.min(Math.max(filters.limit ?? 50, 1), 200);
+  const statuses = filters.statuses?.length ? filters.statuses : KITCHEN_BOARD_DEFAULT;
+
+  const baseMatch: Record<string, any> = {
+    organizationId: new Types.ObjectId(String(organizationId)),
+    isActive: true,
+  };
+  if (filters.outletId) baseMatch.outletId = new Types.ObjectId(filters.outletId);
+  if (filters.orderType) baseMatch.orderType = filters.orderType;
+
+  if (filters.scope === 'today') {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    baseMatch.createdAt = { $gte: startOfDay };
+    baseMatch.orderStatus = { $ne: 'cancelled' };
+  } else {
+    baseMatch.orderStatus = 'active';
+  }
+
+  const statusMatch = { $match: { 'items.status': { $in: statuses } } };
+
+  const [result] = await OrderModel.aggregate([
+    { $match: baseMatch },
+    { $unwind: '$items' },
+    {
+      $facet: {
+        // counts ignore the status filter so every tab can show its badge
+        counts: [{ $group: { _id: '$items.status', count: { $sum: 1 } } }],
+        total: [statusMatch, { $count: 'count' }],
+        data: [
+          statusMatch,
+          { $sort: { 'items.sentToKitchenAt': 1, _id: 1 } },
+          { $skip: (page - 1) * limit },
+          { $limit: limit },
+          {
+            $lookup: {
+              from: RestaurantTableModel.collection.name,
+              localField: 'tableId',
+              foreignField: '_id',
+              as: 'table',
+            },
+          },
+          { $unwind: { path: '$table', preserveNullAndEmptyArrays: true } },
+          {
+            $project: {
+              _id: 0,
+              orderId: '$_id',
+              itemId: '$items._id',
+              orderNo: 1,
+              orderType: 1,
+              outletId: 1,
+              tableId: 1,
+              table: {
+                _id: '$table._id',
+                name: '$table.name',
+                tableName: '$table.tableName',
+                tableNumber: '$table.tableNumber',
+                tableNo: '$table.tableNo',
+              },
+              name: '$items.name',
+              quantity: '$items.quantity',
+              notes: '$items.notes',
+              status: '$items.status',
+              sentToKitchenAt: '$items.sentToKitchenAt',
+              readyAt: '$items.readyAt',
+              servedAt: '$items.servedAt',
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  const counts = Object.fromEntries(KITCHEN_STATUSES.map((s) => [s, 0])) as Record<ItemKitchenStatus, number>;
+  for (const row of result.counts) counts[row._id as ItemKitchenStatus] = row.count;
+
+  const total = result.total[0]?.count ?? 0;
+
+  return {
+    items: result.data,
+    counts,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  };
 };

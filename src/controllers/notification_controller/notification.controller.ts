@@ -33,6 +33,34 @@ export const listNotificationsByOutlet = async (
   }
 };
 
+
+export const listAllNotifications = async (
+  req: RoleBasedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { organizationId } = req.params;
+    const userId = req.user!.userId;
+    const { outletId, page, limit } = req.query;
+
+    if (!organizationId) {
+      return res.status(400).json({ ok: false, message: 'organizationId is required' });
+    }
+
+    const data = await notificationService.listAllNotifications(organizationId, userId, {
+      outletId: outletId as string | undefined,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+
+    return res.status(200).json({ ok: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 // ── GET A SINGLE NOTIFICATION ───────────────────────────────────────
 export const getNotification = async (req: RoleBasedRequest, res: Response, next: NextFunction) => {
   try {

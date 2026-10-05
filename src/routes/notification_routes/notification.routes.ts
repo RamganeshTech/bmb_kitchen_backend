@@ -13,6 +13,13 @@ notificationRoutes.get(
   notificationController.listNotificationsByOutlet
 );
 
+
+notificationRoutes.get(
+  '/v1/:organizationId',
+  multiAuthRole('owner', 'admin', 'cto', 'staff'),
+  notificationController.listAllNotifications
+);
+  
 // ── UNREAD COUNT FOR THE LOGGED-IN USER ─────────────────────────────
 
 // GET /api/notification/v1/:organizationId/:outletId/unread-count

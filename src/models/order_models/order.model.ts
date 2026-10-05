@@ -229,7 +229,9 @@ const orderSchema = new Schema<IOrder>(
 );
 
 // Auto-generate orderNo (e.g. ORD-2026-0001) per organization
-orderSchema.pre('save', async function (this: IOrder) {
+orderSchema.pre('validate', async function (this: IOrder) {
+    if (!this.isNew || this.orderNo) return;
+
   if (!this.isNew) {
     return;
   }
