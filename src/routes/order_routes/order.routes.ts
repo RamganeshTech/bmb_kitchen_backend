@@ -19,6 +19,18 @@ orderRoutes.post(
   orderController.placeNewOrder
 );
 
+
+
+//  KTUCEN ROUTES
+
+
+orderRoutes.get(
+  '/v1/:organizationId/kitchen',
+  multiAuthRole('owner', 'admin', 'cto', "staff"), // Staff usually cannot cancel entire orders, requires Admin/CTO/Owner
+  orderController.getKitchenItems
+);
+
+
 // ── SINGLE ORDER ENDPOINTS ────────────────────────────────────────
 // GET /api/orders/v1/:organizationId/:id
 orderRoutes.get(
@@ -49,10 +61,16 @@ orderRoutes.post(
   orderController.processOrderCheckout
 );
 
+
+orderRoutes.get('/v1/:organizationId/:id/checkout-preview', 
+  multiAuthRole('owner', 'admin', 'cto', 'staff'),
+  orderController.previewOrderCheckout
+  );
+
 // PATCH /api/orders/v1/:organizationId/:id/cancel (Cancel order & Free Table)
 orderRoutes.patch(
   '/v1/:organizationId/:id/cancel',
-  multiAuthRole('owner', 'admin', 'cto'), // Staff usually cannot cancel entire orders, requires Admin/CTO/Owner
+  multiAuthRole('owner', 'admin', 'cto', "staff"), // Staff usually cannot cancel entire orders, requires Admin/CTO/Owner
   orderController.cancelOrder
 );
 
@@ -65,15 +83,6 @@ orderRoutes.get(
 );
 
 
-
-//  KTUCEN ROUTES
-
-
-orderRoutes.get(
-  '/v1/:organizationId/kitchen',
-  multiAuthRole('owner', 'admin', 'cto', "staff"), // Staff usually cannot cancel entire orders, requires Admin/CTO/Owner
-  orderController.getKitchenItems
-);
 
 
 export default orderRoutes;

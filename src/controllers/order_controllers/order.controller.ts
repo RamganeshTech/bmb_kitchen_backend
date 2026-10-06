@@ -126,6 +126,25 @@ export const updateItemKitchenStatus = async (
   }
 };
 
+
+const parseCheckoutInput = (src: any) => {
+  const { offerId, loyaltyPointsRedeemed = 0, manualDiscount = 0 } = src;
+  const points = Number(loyaltyPointsRedeemed);
+  const manual = Number(manualDiscount);
+
+  if (!Number.isInteger(points) || points < 0) return { error: 'Loyalty points must be a whole number, 0 or more' };
+  if (!Number.isFinite(manual) || manual < 0) return { error: 'Manual discount must be 0 or more' };
+  if (offerId && !Types.ObjectId.isValid(String(offerId))) return { error: 'A valid Offer ID is required' };
+
+  return {
+    value: {
+      offerId: offerId ? String(offerId) : undefined,
+      loyaltyPointsRedeemed: points,
+      manualDiscount: manual,
+    },
+  };
+};
+
 // ── 4. PROCESS CHECKOUT & BILLING ─────────────────────────────────
 export const processOrderCheckout = async (
   req: RoleBasedRequest,
@@ -134,7 +153,9 @@ export const processOrderCheckout = async (
 ): Promise<void> => {
   try {
     const { organizationId, id: orderId } = req.params;
-    const { paymentMethod, loyaltyPointsRedeemed = 0, manualDiscount = 0 } = req.body;
+    const { paymentMethod,
+      // loyaltyPointsRedeemed = 0, manualDiscount = 0 
+    } = req.body;
     const userId = req.user!.userId;
 
     if (!organizationId || !Types.ObjectId.isValid(organizationId)) {
@@ -152,13 +173,49 @@ export const processOrderCheckout = async (
       return;
     }
 
+    const parsed = parseCheckoutInput(req.body);
+    if (parsed.error) {
+      res.status(400).json({ ok: false, message: parsed.error });
+      return;
+    }
+
+    // const completedOrder = await orderService.checkoutOrder(organizationId, orderId, userId, {
+    //   paymentMethod,
+    //   loyaltyPointsRedeemed,
+    //   manualDiscount,
+    // });
+
     const completedOrder = await orderService.checkoutOrder(organizationId, orderId, userId, {
       paymentMethod,
-      loyaltyPointsRedeemed,
-      manualDiscount,
+      ...parsed.value!,
     });
 
     res.status(200).json({ ok: true, data: completedOrder });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+// ── 4b. CHECKOUT PREVIEW ──────────────────────────────────────────
+export const previewOrderCheckout = async (req: RoleBasedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { organizationId, id: orderId } = req.params;
+
+    if (!organizationId || !Types.ObjectId.isValid(organizationId) || !orderId || !Types.ObjectId.isValid(orderId)) {
+      res.status(400).json({ ok: false, message: 'Valid Organization ID and Order ID are required' });
+      return;
+    }
+
+    const parsed = parseCheckoutInput(req.query);
+    if (parsed.error) {
+      res.status(400).json({ ok: false, message: parsed.error });
+      return;
+    }
+
+    const preview = await orderService.previewCheckout(organizationId, orderId, parsed.value!);
+    res.status(200).json({ ok: true, data: preview });
   } catch (error) {
     next(error);
   }
@@ -199,8 +256,8 @@ export const getActiveOrders = async (
 ): Promise<void> => {
   try {
     const { organizationId } = req.params;
-    
-    const {outletId}= req.query
+
+    const { outletId } = req.query
 
     if (!organizationId || !Types.ObjectId.isValid(organizationId)) {
       res.status(400).json({ ok: false, message: 'A valid Organization ID is required' });

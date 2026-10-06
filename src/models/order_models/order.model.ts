@@ -43,6 +43,11 @@ export interface IOrder extends Document {
   // Billing calculations
   subTotal: number;
   discountAmount: number;
+  appliedOfferId: Types.ObjectId
+  offerDiscountAmount: number
+  loyaltyDiscountAmount: number
+  manualDiscountAmount: number
+  serviceChargeAmount: number
   taxPercent: number;
   taxAmount: number;
   grandTotal: number;
@@ -169,6 +174,13 @@ const orderSchema = new Schema<IOrder>(
       default: 0,
       min: 0,
     },
+
+    appliedOfferId: { type: Schema.Types.ObjectId, ref: 'OfferModel', default: null },
+    offerDiscountAmount: { type: Number, default: 0, min: 0 },
+    loyaltyDiscountAmount: { type: Number, default: 0, min: 0 },
+    manualDiscountAmount: { type: Number, default: 0, min: 0 },
+    serviceChargeAmount: { type: Number, default: 0, min: 0 },
+
     taxPercent: {
       type: Number,
       default: 5, // e.g. 5% GST
@@ -230,7 +242,7 @@ const orderSchema = new Schema<IOrder>(
 
 // Auto-generate orderNo (e.g. ORD-2026-0001) per organization
 orderSchema.pre('validate', async function (this: IOrder) {
-    if (!this.isNew || this.orderNo) return;
+  if (!this.isNew || this.orderNo) return;
 
   if (!this.isNew) {
     return;

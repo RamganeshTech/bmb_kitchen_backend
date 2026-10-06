@@ -1,10 +1,12 @@
-import mongoose, { Types } from 'mongoose';
+import mongoose, { ClientSession, Types } from 'mongoose';
 import OrderModel, { OrderStatus, OrderType, PaymentStatus, type IOrder, type IOrderItem, type ItemKitchenStatus } from '../../models/order_models/order.model.js';
 import CustomerModel from '../../models/customer_models/customer.model.js';
 import { ApiError } from '../../utils/apiError.js';
 import RestaurantTableModel from '../../models/restaurant_table_model/restaurantTable.model.js';
 import TaxSettingsModel from '../../models/taxSettings_model/taxSetting.model.js';
 import LoyaltyProgramModel from '../../models/loyaltyProgram_model/loyaltyProgram.model.js';
+import OfferModel from '../../models/offer_model/offer.model.js';
+import MenuItemModel from '../../models/menu_models/menuItem.model.js';
 
 // ── INTERNAL HELPER: CALCULATE TOTALS ─────────────────────────────
 // const recalculateTotals = (
@@ -160,112 +162,8 @@ export const updateOrderItemStatus = async (
   return order;
 };
 
-// // ── 4. PROCESS CHECKOUT & BILLING (Transactional) ─────────────────
-// export const checkoutOrder = async (
-//   organizationId: string | Types.ObjectId,
-//   orderId: string,
-//   userId: string | Types.ObjectId,
-//   checkoutData: {
-//     paymentMethod: IOrder['paymentMethod'];
-//     loyaltyPointsRedeemed: number;
-//     manualDiscount: number;
-//   }
-// ): Promise<IOrder> => {
-//   const session = await mongoose.startSession();
-//   session.startTransaction();
 
-//   try {
-//     const order = await OrderModel.findOne({ _id: orderId, organizationId }).session(session);
-//     if (!order) throw new ApiError(404, 'Order not found');
-//     if (order.orderStatus === 'completed') throw new ApiError(400, 'Order is already completed');
-
-//     // Handle Loyalty Points if claimed
-//     if (checkoutData.loyaltyPointsRedeemed > 0) {
-//       if (!order.customerId) {
-//         throw new ApiError(400, 'Cannot redeem loyalty points on a guest order');
-//       }
-
-//       const customer = await CustomerModel.findById(order.customerId).session(session);
-//       if (!customer || customer.loyaltyPoints < checkoutData.loyaltyPointsRedeemed) {
-//         throw new ApiError(400, 'Insufficient loyalty points available');
-//       }
-
-//       // Deduct points (1 point = 1 unit of currency logic assumed here)
-//       customer.loyaltyPoints -= checkoutData.loyaltyPointsRedeemed;
-//       await customer.save({ session });
-//     }
-
-//     // Apply combined discounts and recalculate
-//     const totalDiscount = checkoutData.loyaltyPointsRedeemed + checkoutData.manualDiscount;
-//     const totals = recalculateTotals(order.items, totalDiscount, order.taxPercent);
-
-//     // Generate Unique Bill Number (BILL-2026-0001 format)
-//     const currentYear = new Date().getFullYear();
-//     const prefix = `BILL-${currentYear}-`;
-//     const lastCompletedOrder = await OrderModel.findOne({
-//       organizationId,
-//       billNo: { $regex: `^${prefix}` },
-//     })
-//       .sort({ paidAt: -1 })
-//       .select('billNo')
-//       .session(session)
-//       .lean();
-
-//     let nextBillNumber = 1;
-//     if (lastCompletedOrder?.billNo) {
-//       const lastNumberStr = lastCompletedOrder.billNo.split('-').pop();
-//       nextBillNumber = (parseInt(lastNumberStr || '0', 10) || 0) + 1;
-//     }
-//     const billNo = `${prefix}${String(nextBillNumber).padStart(4, '0')}`;
-
-//     // Update Order state
-//     order.loyaltyPointsRedeemed = checkoutData.loyaltyPointsRedeemed;
-//     order.discountAmount = totalDiscount;
-//     order.subTotal = totals.subTotal;
-//     order.taxAmount = totals.taxAmount;
-//     order.grandTotal = totals.grandTotal;
-
-//     order.billNo = billNo;
-//     order.orderStatus = 'completed';
-//     order.paymentStatus = 'paid';
-//     order.paymentMethod = checkoutData.paymentMethod;
-//     order.paidAt = new Date();
-//     order.updatedBy = userId as Types.ObjectId;
-
-//     await order.save({ session });
-
-//     // Update Customer Lifetime Value (if customer exists)
-//     if (order.customerId) {
-//       await CustomerModel.findByIdAndUpdate(
-//         order.customerId,
-//         {
-//           $inc: { totalSpent: totals.grandTotal, totalVisits: 1 },
-//         },
-//         { session }
-//       );
-//     }
-
-//     // TODO: Free up the table by setting Table status back to 'available'
-
-//     // ✅ RESOLVED: Free up the table safely inside the transaction
-//     if (order.tableId) {
-//       await RestaurantTableModel.findByIdAndUpdate(
-//         order.tableId,
-//         { $set: { status: 'available' } },
-//         { session }
-//       );
-//     }
-
-//     await session.commitTransaction();
-//     session.endSession();
-
-//     return order;
-//   } catch (error) {
-//     await session.abortTransaction();
-//     session.endSession();
-//     throw error;
-//   }
-// };
+const round2 = (n: number) => Math.round(n * 100) / 100;
 
 
 // Now takes serviceChargePercent too — service charge applies on the taxable
@@ -276,14 +174,183 @@ function recalculateTotals(
   taxPercent: number,
   serviceChargePercent: number = 0
 ) {
-  const subTotal = items.reduce((sum, item) => sum + item.itemTotal, 0);
+  const billable = items.filter((item) => item.status !== 'cancelled');
+
+  const subTotal = billable.reduce((sum, item) => sum + item.itemTotal, 0);
   const taxableAmount = Math.max(subTotal - discountAmount, 0);
   const serviceChargeAmount = (taxableAmount * serviceChargePercent) / 100;
   const taxAmount = ((taxableAmount + serviceChargeAmount) * taxPercent) / 100;
   const grandTotal = taxableAmount + serviceChargeAmount + taxAmount;
 
-  return { subTotal, taxAmount, grandTotal };
+
+  // return { subTotal, taxAmount, grandTotal };
+
+  return {
+    subTotal: round2(subTotal),
+    serviceChargeAmount: round2(serviceChargeAmount),
+    taxAmount: round2(taxAmount),
+    grandTotal: round2(grandTotal),
+  };
+
 }
+
+type CheckoutInput = { offerId?: string; loyaltyPointsRedeemed: number; manualDiscount: number };
+
+const buildCheckoutQuote = async (
+  organizationId: string | Types.ObjectId,
+  order: any, // hydrated order document
+  input: CheckoutInput,
+  session?: ClientSession
+) => {
+  const s = session ?? null;
+  const billable = order.items.filter((i: IOrderItem) => i.status !== 'cancelled');
+  if (!billable.length) throw new ApiError(400, 'Cannot checkout an order with no items');
+  const sumOf = (list: IOrderItem[]) => list.reduce((sum, i) => sum + i.itemTotal, 0);
+  const subTotal = round2(sumOf(billable));
+
+  // ── Tax + service charge (same rules as createOrder) ──
+  const taxSettings = await TaxSettingsModel.findOne({ organizationId }).session(s);
+  let taxPercent = order.taxPercent;
+  let serviceChargePercent = 0;
+  if (taxSettings) {
+    const defaultRate = taxSettings.rates.find((r) => r.isActive) || taxSettings.rates[0];
+    if (defaultRate) taxPercent = defaultRate.percentage;
+    if (taxSettings.serviceCharge > 0) {
+      const isDineIn = order.orderType === 'dine_in';
+      if (!isDineIn || taxSettings.scOnDinein) serviceChargePercent = taxSettings.serviceCharge;
+    }
+  }
+
+  // ── 1. Offer ──
+  let offer: any = null;
+  let offerDiscount = 0;
+  if (input.offerId) {
+    offer = await OfferModel.findOne({ _id: input.offerId, organizationId, isActive: true }).session(s);
+    if (!offer) throw new ApiError(404, 'Offer not found or inactive');
+
+    const endOfDay = new Date(offer.endDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    if (new Date() < offer.startDate || new Date() > endOfDay) throw new ApiError(400, 'This offer is not valid today');
+    if (subTotal < offer.minOrderAmount) {
+      throw new ApiError(400, `Minimum order of ₹${offer.minOrderAmount} required for this offer`);
+    }
+
+    let eligible = subTotal;
+    if (offer.applicableOn === 'item') {
+      const ids = new Set(offer.menuItemIds.map(String));
+      eligible = sumOf(billable.filter((i: IOrderItem) => ids.has(String(i.menuItemId))));
+    } else if (offer.applicableOn === 'category') {
+      const cats = new Set(offer.categoryIds.map(String));
+      const menu = await MenuItemModel.find({
+        _id: { $in: billable.map((i: IOrderItem) => i.menuItemId) },
+        organizationId,
+      })
+        .select('categoryId')
+        .session(s)
+        .lean();
+      const categoryByItem = new Map(menu.map((m: any) => [String(m._id), String(m.categoryId)]));
+      eligible = sumOf(
+        billable.filter((i: IOrderItem) => cats.has(categoryByItem.get(String(i.menuItemId)) ?? ''))
+      );
+    }
+    if (eligible <= 0) throw new ApiError(400, 'This offer does not apply to any item in this order');
+
+    if (offer.usageLimit != null) {
+      const used = await OrderModel.countDocuments({
+        organizationId,
+        appliedOfferId: offer._id,
+        orderStatus: 'completed',
+      }).session(s);
+      if (used >= offer.usageLimit) throw new ApiError(400, 'This offer has reached its usage limit');
+    }
+    if (offer.perCustomerLimit != null) {
+      if (!order.customerId) throw new ApiError(400, 'Select a registered customer to use this offer');
+      const usedByCustomer = await OrderModel.countDocuments({
+        organizationId,
+        appliedOfferId: offer._id,
+        customerId: order.customerId,
+        orderStatus: 'completed',
+      }).session(s);
+      if (usedByCustomer >= offer.perCustomerLimit) {
+        throw new ApiError(400, 'This customer has already used this offer the maximum number of times');
+      }
+    }
+
+    let discount =
+      offer.discountType === 'percentage' ? (eligible * offer.discountValue) / 100 : offer.discountValue;
+    if (offer.maxDiscountAmount != null) discount = Math.min(discount, offer.maxDiscountAmount);
+    offerDiscount = round2(Math.min(discount, eligible));
+  }
+
+  // ── 2. Manual discount ──
+  if (input.manualDiscount < 0) throw new ApiError(400, 'Manual discount cannot be negative');
+  if (input.manualDiscount > subTotal - offerDiscount) {
+    throw new ApiError(400, 'Manual discount cannot exceed the bill amount');
+  }
+  const manualDiscount = round2(input.manualDiscount);
+
+  // ── 3. Loyalty points (last, capped by what is left of the bill) ──
+  const remaining = round2(subTotal - offerDiscount - manualDiscount);
+  const points = input.loyaltyPointsRedeemed;
+  let loyaltyDiscount = 0;
+  let maxRedeemablePoints = 0;
+
+  if (order.customerId) {
+    const program: any = await LoyaltyProgramModel.findOne({ organizationId }).session(s).lean();
+    const customer: any = await CustomerModel.findOne({ _id: order.customerId, organizationId }).session(s).lean();
+
+    if (program?.isEnabled && program.pointValue > 0 && customer && customer.loyaltyPoints >= program.minPointsToRedeem) {
+      maxRedeemablePoints = Math.min(customer.loyaltyPoints, Math.floor(remaining / program.pointValue));
+    }
+
+    if (points > 0) {
+      if (!program?.isEnabled) throw new ApiError(400, 'Loyalty program is not enabled for this organization');
+      if (!program.pointValue) throw new ApiError(400, 'Loyalty points have no cash value');
+      if (!customer) throw new ApiError(404, 'Customer not found');
+      if (customer.loyaltyPoints < program.minPointsToRedeem) {
+        throw new ApiError(400, `Minimum ${program.minPointsToRedeem} points required before redeeming`);
+      }
+      if (points > customer.loyaltyPoints) throw new ApiError(400, 'Insufficient loyalty points available');
+      if (points > maxRedeemablePoints) throw new ApiError(400, 'Points exceed the bill amount');
+      loyaltyDiscount = round2(points * program.pointValue);
+    }
+  } else if (points > 0) {
+    throw new ApiError(400, 'Cannot redeem loyalty points on a guest order');
+  }
+
+  const totalDiscount = round2(offerDiscount + manualDiscount + loyaltyDiscount);
+  const totals = recalculateTotals(order.items, totalDiscount, taxPercent, serviceChargePercent);
+
+  return {
+    offer,
+    points,
+    subTotal: totals.subTotal,
+    offerDiscount,
+    manualDiscount,
+    loyaltyDiscount,
+    totalDiscount,
+    taxPercent,
+    serviceChargePercent,
+    serviceChargeAmount: totals.serviceChargeAmount,
+    taxAmount: totals.taxAmount,
+    grandTotal: totals.grandTotal,
+    maxRedeemablePoints,
+  };
+};
+
+// ── 4b. CHECKOUT PREVIEW ──────────────────────────────────────────
+export const previewCheckout = async (
+  organizationId: string | Types.ObjectId,
+  orderId: string,
+  input: CheckoutInput
+) => {
+  const order = await OrderModel.findOne({ _id: orderId, organizationId });
+  if (!order) throw new ApiError(404, 'Order not found');
+  if (order.orderStatus !== 'active') throw new ApiError(400, `Order is already ${order.orderStatus}`);
+
+  const { offer, points, ...quote } = await buildCheckoutQuote(organizationId, order, input);
+  return { ...quote, pointsRedeemed: points };
+};
 
 // ── 4. PROCESS CHECKOUT & BILLING (Transactional) ─────────────────
 export const checkoutOrder = async (
@@ -302,8 +369,21 @@ export const checkoutOrder = async (
   try {
     const order = await OrderModel.findOne({ _id: orderId, organizationId }).session(session);
     if (!order) throw new ApiError(404, 'Order not found');
-    if (order.orderStatus === 'completed') throw new ApiError(400, 'Order is already completed');
-    if (!order.items.length) throw new ApiError(400, 'Cannot checkout an order with no items');
+    if (order.orderStatus !== 'active') throw new ApiError(400, `Order is already ${order.orderStatus}`);
+    // if (order.orderStatus === 'completed') throw new ApiError(400, 'Order is already completed');
+    // if (!order.items.length) throw new ApiError(400, 'Cannot checkout an order with no items');
+
+    const quote = await buildCheckoutQuote(organizationId, order, checkoutData, session);
+
+    // Atomic redeem: the $gte guard stops two cashiers spending the same points
+    if (quote.points > 0) {
+      const redeemed = await CustomerModel.updateOne(
+        { _id: order.customerId, organizationId, loyaltyPoints: { $gte: quote.points } },
+        { $inc: { loyaltyPoints: -quote.points } },
+        { session }
+      );
+      if (redeemed.modifiedCount !== 1) throw new ApiError(400, 'Insufficient loyalty points available');
+    }
 
     // ── Tax settings: use the org's configured default slab + service charge ──
     // Falls back to the order's own taxPercent if no TaxSettings doc exists yet.
@@ -383,12 +463,33 @@ export const checkoutOrder = async (
     const billNo = `${prefix}${String(nextBillNumber).padStart(4, '0')}`;
 
     // ── Update order state ──
-    order.loyaltyPointsRedeemed = checkoutData.loyaltyPointsRedeemed;
-    order.discountAmount = totalDiscount;
-    order.taxPercent = taxPercent;
-    order.subTotal = totals.subTotal;
-    order.taxAmount = totals.taxAmount;
-    order.grandTotal = totals.grandTotal;
+    // order.loyaltyPointsRedeemed = checkoutData.loyaltyPointsRedeemed;
+    // order.discountAmount = totalDiscount;
+    // order.taxPercent = taxPercent;
+    // order.subTotal = totals.subTotal;
+    // order.taxAmount = totals.taxAmount;
+    // order.grandTotal = totals.grandTotal;
+
+    // order.billNo = billNo;
+    // order.orderStatus = 'completed';
+    // order.paymentStatus = 'paid';
+    // order.paymentMethod = checkoutData.paymentMethod;
+    // order.paidAt = new Date();
+    // order.updatedBy = userId as Types.ObjectId;
+
+    // await order.save({ session });
+
+    order.loyaltyPointsRedeemed = quote.points;
+    order.appliedOfferId = quote.offer?._id ?? null;
+    order.offerDiscountAmount = quote.offerDiscount;
+    order.loyaltyDiscountAmount = quote.loyaltyDiscount;
+    order.manualDiscountAmount = quote.manualDiscount;
+    order.discountAmount = quote.totalDiscount;
+    order.taxPercent = quote.taxPercent;
+    order.subTotal = quote.subTotal;
+    order.serviceChargeAmount = quote.serviceChargeAmount;
+    order.taxAmount = quote.taxAmount;
+    order.grandTotal = quote.grandTotal;
 
     order.billNo = billNo;
     order.orderStatus = 'completed';
@@ -396,7 +497,6 @@ export const checkoutOrder = async (
     order.paymentMethod = checkoutData.paymentMethod;
     order.paidAt = new Date();
     order.updatedBy = userId as Types.ObjectId;
-
     await order.save({ session });
 
     // ── Award new loyalty points earned on this spend (only if program is on) ──
