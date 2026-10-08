@@ -168,7 +168,8 @@ const orderSchema = new Schema<IOrder>(
       required: true,
       default: 0,
       min: 0,
-    },
+    }, 
+    
     discountAmount: {
       type: Number,
       default: 0,

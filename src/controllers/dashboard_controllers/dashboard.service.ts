@@ -4,6 +4,10 @@ import ExpenseModel from '../../models/expense_model/expense.model.js';
 import RestaurantTableModel from '../../models/restaurant_table_model/restaurantTable.model.js';
 import DayClosingModel from '../../models/dayClosing_model/dayClosing.model.js';
 import { InventoryModel } from '../../models/inventory_model/Inventory.model.js';
+import { parseDateIST, todayIST } from '../report_controllers/report-filters.util.js';
+import { ApiError } from '../../utils/apiError.js';
+import { DAY_MS } from '../../utils/dateRange.js';
+import { IST_OFFSET_MS } from '../../constants/constants.js';
 
 /**
  * Resolves the start/end Date boundaries for a single calendar day.
@@ -11,16 +15,20 @@ import { InventoryModel } from '../../models/inventory_model/Inventory.model.js'
  * the HTML's dashboard which is always "today" — no historic scrolling).
  */
 function resolveDayRange(dateStr?: string) {
-  const day = dateStr || new Date().toISOString().slice(0, 10);
-  const start = new Date(`${day}T00:00:00.000`);
-  const end = new Date(`${day}T23:59:59.999`);
+  // const day = dateStr || new Date().toISOString().slice(0, 10);
+  // const start = new Date(`${day}T00:00:00.000`);
+  // const end = new Date(`${day}T23:59:59.999`);
+  // return { day, start, end };
+  const day = dateStr || todayIST();
+  const start = parseDateIST(day);
+  if (!start) throw new ApiError(400, 'date must be a valid date (YYYY-MM-DD)');
+  const end = new Date(start.getTime() + DAY_MS - 1);
   return { day, start, end };
 }
-
 function previousDay(dateStr: string) {
-  const d = new Date(`${dateStr}T00:00:00.000`);
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
+  const start = parseDateIST(dateStr);
+  if (!start) throw new ApiError(400, 'date must be a valid date (YYYY-MM-DD)');
+  return new Date(start.getTime() - DAY_MS + IST_OFFSET_MS).toISOString().slice(0, 10);
 }
 
 function percentDelta(current: number, previous: number) {
@@ -295,7 +303,8 @@ export const getDashboardSummary = async (organizationId: string, outletId: stri
     ]);
 
   return {
-    date: date || new Date().toISOString().slice(0, 10),
+    // date: date || new Date().toISOString().slice(0, 10),
+    date: date || todayIST,
     salesKpis,
     salesByHour,
     kitchenTicketStatus,

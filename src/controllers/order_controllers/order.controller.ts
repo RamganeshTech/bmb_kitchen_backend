@@ -271,6 +271,95 @@ export const getActiveOrders = async (
   }
 };
 
+
+const VALID_SCOPES = ['today', 'week', 'month', 'year', 'custom', 'all'];
+const VALID_ORDER_TYPES = ['dine_in', 'takeaway', 'delivery', 'online'];
+const VALID_PAYMENT_METHODS = ['cash', 'card', 'upi', 'split'];
+const DATE_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
+
+export const getMyOrders = async (req: RoleBasedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { organizationId } = req.params;
+    const userId = req.user!.userId;
+    const {
+      outletId, scope, from, to, orderType, paymentMethod, tableId, customerId,
+      search, minAmount, maxAmount, hasDiscount, sortBy, sortOrder, page, limit,
+    } = req.query;
+
+    // console.log("calling this one lget my orders only")
+
+    if (!organizationId || !Types.ObjectId.isValid(organizationId)) {
+      res.status(400).json({ ok: false, message: 'A valid Organization ID is required' });
+      return;
+    }
+
+    for (const [label, value] of [['outletId', outletId], ['tableId', tableId], ['customerId', customerId]] as const) {
+      if (value && !Types.ObjectId.isValid(String(value))) {
+        res.status(400).json({ ok: false, message: `A valid ${label} is required` });
+        return;
+      }
+    }
+
+    if (scope && !VALID_SCOPES.includes(String(scope))) {
+      res.status(400).json({ ok: false, message: `scope must be one of: ${VALID_SCOPES.join(', ')}` });
+      return;
+    }
+    if (scope === 'custom') {
+      if (!from || !to || !DATE_FORMAT.test(String(from)) || !DATE_FORMAT.test(String(to))) {
+        res.status(400).json({ ok: false, message: 'from and to must be valid dates (YYYY-MM-DD)' });
+        return;
+      }
+      if (String(from) > String(to)) {
+        res.status(400).json({ ok: false, message: 'from cannot be after to' });
+        return;
+      }
+    }
+
+    if (orderType && !VALID_ORDER_TYPES.includes(String(orderType))) {
+      res.status(400).json({ ok: false, message: `orderType must be one of: ${VALID_ORDER_TYPES.join(', ')}` });
+      return;
+    }
+    if (paymentMethod && !VALID_PAYMENT_METHODS.includes(String(paymentMethod))) {
+      res.status(400).json({ ok: false, message: `paymentMethod must be one of: ${VALID_PAYMENT_METHODS.join(', ')}` });
+      return;
+    }
+
+    const min = minAmount !== undefined && minAmount !== '' ? Number(minAmount) : undefined;
+    const max = maxAmount !== undefined && maxAmount !== '' ? Number(maxAmount) : undefined;
+    if ((min !== undefined && isNaN(min)) || (max !== undefined && isNaN(max))) {
+      res.status(400).json({ ok: false, message: 'minAmount and maxAmount must be numbers' });
+      return;
+    }
+    if (min !== undefined && max !== undefined && min > max) {
+      res.status(400).json({ ok: false, message: 'minAmount cannot be greater than maxAmount' });
+      return;
+    }
+
+    const data = await orderService.listMyOrders(organizationId, userId, {
+      outletId: outletId ? String(outletId) : undefined,
+      scope: scope as any,
+      from: from ? String(from) : undefined,
+      to: to ? String(to) : undefined,
+      orderType: orderType as any,
+      paymentMethod: paymentMethod as any,
+      tableId: tableId ? String(tableId) : undefined,
+      customerId: customerId ? String(customerId) : undefined,
+      search: search ? String(search).trim() : undefined,
+      minAmount: min,
+      maxAmount: max,
+      hasDiscount: hasDiscount === 'true' ? true : hasDiscount === 'false' ? false : undefined,
+      sortBy: sortBy as any,
+      sortOrder: sortOrder as any,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+
+    res.status(200).json({ ok: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // ── 7. GET SINGLE ORDER ───────────────────────────────────────────
 export const getOrderById = async (
   req: RoleBasedRequest,
@@ -284,6 +373,8 @@ export const getOrderById = async (
       res.status(400).json({ ok: false, message: 'A valid Organization ID is required' });
       return;
     }
+
+    console.log("calling this one lget get order by id  only")
 
     if (!orderId || !Types.ObjectId.isValid(orderId)) {
       res.status(400).json({ ok: false, message: 'A valid Order ID is required' });
@@ -343,12 +434,15 @@ export const getKitchenItems = async (
 ): Promise<void> => {
   try {
     const { organizationId } = req.params;
-    const { outletId, status, orderType, scope, page, limit } = req.query;
+    // const { outletId, status, orderType, scope, page, limit } = req.query;
+    const { outletId, status, orderType, scope, page, limit, range, from, to, search } = req.query;
 
     if (!organizationId || !Types.ObjectId.isValid(organizationId)) {
       res.status(400).json({ ok: false, message: 'A valid Organization ID is required' });
       return;
     }
+
+
 
     if (outletId && !Types.ObjectId.isValid(String(outletId))) {
       res.status(400).json({ ok: false, message: 'A valid outlet ID is required' });
@@ -371,6 +465,24 @@ export const getKitchenItems = async (
       return;
     }
 
+
+    const validRanges = ['today', 'week', 'month', 'year', 'custom'];
+    if (range && !validRanges.includes(String(range))) {
+      res.status(400).json({ ok: false, message: `range must be one of: ${validRanges.join(', ')}` });
+      return;
+    }
+
+    if (range === 'custom') {
+      const dateFormat = /^\d{4}-\d{2}-\d{2}$/;
+      if (!from || !to || !dateFormat.test(String(from)) || !dateFormat.test(String(to))) {
+        res.status(400).json({ ok: false, message: 'from and to must be valid dates (YYYY-MM-DD)' });
+        return;
+      }
+      if (String(from) > String(to)) {
+        res.status(400).json({ ok: false, message: 'from cannot be after to' });
+        return;
+      }
+    }
     const data = await orderService.listKitchenItems(organizationId, {
       outletId: outletId ? String(outletId) : undefined,
       statuses: statuses as ItemKitchenStatus[] | undefined,
@@ -378,6 +490,10 @@ export const getKitchenItems = async (
       scope: scope as 'running' | 'today' | undefined,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
+      range: range as 'today' | 'week' | 'month' | 'year' | 'custom' | undefined,
+      from: from ? String(from) : undefined,
+      to: to ? String(to) : undefined,
+      search: search ? String(search).trim() : undefined,
     });
 
     res.status(200).json({ ok: true, data });

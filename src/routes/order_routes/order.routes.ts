@@ -12,6 +12,14 @@ orderRoutes.get(
   orderController.getActiveOrders
 );
 
+
+
+orderRoutes.get(
+  '/v1/:organizationId/my-orders',
+  multiAuthRole('owner', 'admin', 'cto', 'staff'),
+  orderController.getMyOrders
+);
+
 // POST /api/orders/v1/:organizationId (Place new order & occupy table)
 orderRoutes.post(
   '/v1/:organizationId',

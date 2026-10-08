@@ -20,9 +20,9 @@ export const register = async (
             return;
         }
 
-        const { user, token } = await authService.registerUser(name, email, password, role, organizationId);
+        const { user } = await authService.registerUser(name, email, password, role, organizationId);
 
-        res.status(201).json({ ok: true, token, data: user });
+        res.status(201).json({ ok: true, data: user });
     } catch (error) {
         next(error);
     }
@@ -43,6 +43,8 @@ export const login = async (
 
         const { user, token } = await authService.loginUser(email, password);
 
+
+
         res.cookie("accessToken", token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
@@ -51,6 +53,7 @@ export const login = async (
             maxAge: 7 * 24 * 60 * 60 * 1000,
         })
         // res.cookie(specificRefreshKey, refreshToken, { ...cookieOptions, maxAge: 1000 * 60 * 60 * 24 * 7 });
+
 
         res.status(200).json({ ok: true, token, data: user });
     } catch (error) {
@@ -66,6 +69,7 @@ export const getAllUsers = async (
     try {
         const { organizationId } = req.user!;
         const { email, phoneNo, role, userName, isActive, page, limit } = req.query;
+
 
         const result = await authService.getAllUsers(organizationId, {
             email,
@@ -212,29 +216,63 @@ export const resetPassword = async (
 
 
 export const updateUserData = async (
+    req: RoleBasedRequest,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            return res.status(401).json({ ok: false, message: 'Unauthorized: User ID missing' });
+        }
+
+        // Explicitly destructure only allowed fields from body
+        const { email, userName, phoneNo } = req.body;
+
+        const updatedUser = await authService.updateUserData(userId, {
+            email,
+            userName,
+            phoneNo,
+        });
+
+        return res.status(200).json({
+            ok: true,
+            message: 'User profile updated successfully',
+            data: updatedUser,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+
+export const updateUserRole = async (
   req: RoleBasedRequest,
   res: Response,
   next: NextFunction
-) => {
+): Promise<void> => {
   try {
-    const userId = req.user?.userId;
+    const { userId } = req.params;
+    const { role } = req.body;
+    const { organizationId } = req.user!;
+
     if (!userId) {
-      return res.status(401).json({ ok: false, message: 'Unauthorized: User ID missing' });
+      res.status(400).json({ ok: false, message: "User ID is required" });
+      return;
     }
 
-    // Explicitly destructure only allowed fields from body
-    const { email, userName, phoneNo } = req.body;
+    if (!role) {
+      res.status(400).json({ ok: false, message: "Role is required" });
+      return;
+    }
 
-    const updatedUser = await authService.updateUserData(userId, {
-      email,
-      userName,
-      phoneNo,
-    });
+    const result = await authService.updateUserRole(userId, organizationId, role);
 
-    return res.status(200).json({
+    res.status(200).json({
       ok: true,
-      message: 'User profile updated successfully',
-      data: updatedUser,
+      message: result.message,
+      data: result.user,
     });
   } catch (error) {
     next(error);
@@ -242,92 +280,165 @@ export const updateUserData = async (
 };
 
 export const getSingleUser = async (
-  req: RoleBasedRequest,
-  res: Response,
-  next: NextFunction
+    req: RoleBasedRequest,
+    res: Response,
+    next: NextFunction
 ) => {
-  try {
-    const { userId } = req.params;
+    try {
+        const { userId } = req.params;
 
-    if (!userId) {
-      return res.status(400).json({ ok: false, message: "User ID is required" });
+        if (!userId) {
+            return res.status(400).json({ ok: false, message: "User ID is required" });
+        }
+
+        const user = await authService.getByUserId(userId);
+
+
+        return res.status(200).json({
+            ok: true,
+            data: user?.user || null,
+        });
+    } catch (error) {
+        next(error);
     }
-
-    const user = await authService.getByUserId(userId);
-    
-
-    return res.status(200).json({
-      ok: true,
-      data: user?.user || null,
-    });
-  } catch (error) {
-    next(error);
-  }
 };
 
 
 export const updateProfileImage = async (
-  req: RoleBasedRequest,
-  res: Response,
-  next: NextFunction
+    req: RoleBasedRequest,
+    res: Response,
+    next: NextFunction
 ): Promise<void> => {
-  try {
-    const { organizationId, userId } = req.params;
-    const file = req.file;
+    try {
+        const { organizationId, userId } = req.params;
+        const file = req.file;
 
-    if (!organizationId) {
-      res.status(400).json({ ok: false, message: "organizationId is required" });
-      return;
-    }
-    if (!userId) {
-      res.status(400).json({ ok: false, message: "userId is required" });
-      return;
-    }
-    if (!file) {
-      res.status(400).json({ ok: false, message: "file is required" });
-      return;
-    }
+        if (!organizationId) {
+            res.status(400).json({ ok: false, message: "organizationId is required" });
+            return;
+        }
+        if (!userId) {
+            res.status(400).json({ ok: false, message: "userId is required" });
+            return;
+        }
+        if (!file) {
+            res.status(400).json({ ok: false, message: "file is required" });
+            return;
+        }
 
-    const result = await authService.updateProfileImage(organizationId, userId, file);
+        const result = await authService.updateProfileImage(organizationId, userId, file);
 
-    res.status(200).json({ ok: true, data: result, message: "Profile image updated successfully" });
-  } catch (error) {
-    next(error);
-  }
+        res.status(200).json({ ok: true, data: result, message: "Profile image updated successfully" });
+    } catch (error) {
+        next(error);
+    }
 };
 
 
 
 export const updateUserPermissions = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
+    req: Request,
+    res: Response,
+    next: NextFunction
 ): Promise<void> => {
-  try {
-    const { userId } = req.params as { userId: string };
-    const { permissions } = req.body;
+    try {
+        const { userId } = req.params as { userId: string };
+        const { permissions } = req.body;
 
-    if (!userId) {
-      res.status(400).json({ ok: false, message: 'User ID is required' });
-      return;
+        if (!userId) {
+            res.status(400).json({ ok: false, message: 'User ID is required' });
+            return;
+        }
+
+        if (!permissions || typeof permissions !== 'object' || Object.keys(permissions).length === 0) {
+            res.status(400).json({
+                ok: false,
+                message: 'Permissions object with at least one module is required',
+            });
+            return;
+        }
+
+        const updatedUser = await authService.updateUserPermissions(userId, permissions);
+
+        res.status(200).json({
+            ok: true,
+            message: 'Permissions updated successfully',
+            data: updatedUser,
+        });
+    } catch (error) {
+        next(error);
     }
-
-    if (!permissions || typeof permissions !== 'object' || Object.keys(permissions).length === 0) {
-      res.status(400).json({
-        ok: false,
-        message: 'Permissions object with at least one module is required',
-      });
-      return;
-    }
-
-    const updatedUser = await authService.updateUserPermissions(userId, permissions);
-
-    res.status(200).json({
-      ok: true,
-      message: 'Permissions updated successfully',
-      data: updatedUser,
-    });
-  } catch (error) {
-    next(error);
-  }
 };
+
+
+
+export const deleteUser = async (
+    req: RoleBasedRequest,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        const { userId } = req.params;
+
+        if (!userId) {
+            return res.status(400).json({ ok: false, message: "User ID is required" });
+        }
+
+        const result = await authService.deleteUserById(userId);
+
+        return res.status(200).json({
+            ok: true,
+            message: result.message,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+
+// 1. Soft Delete Controller
+export const softDeleteUser = async (
+    req: RoleBasedRequest,
+    res: Response,
+    next: NextFunction
+): Promise<void> => {
+    try {
+        const { userId } = req.params;
+        const { organizationId } = req.user!;
+
+        if (!userId) {
+            res.status(400).json({ ok: false, message: "User ID is required" });
+            return;
+        }
+
+        const result = await authService.softDeleteUser(userId, organizationId);
+        res.status(200).json({ ok: true, message: result.message });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// 2. Recover User Controller
+export const recoverUser = async (
+    req: RoleBasedRequest,
+    res: Response,
+    next: NextFunction
+): Promise<void> => {
+    try {
+        const { userId } = req.params;
+        const { organizationId } = req.user!;
+
+        if (!userId) {
+            res.status(400).json({ ok: false, message: "User ID is required" });
+            return;
+        }
+
+        const result = await authService.recoverUser(userId, organizationId);
+        res.status(200).json({ ok: true, message: result.message });
+    } catch (error) {
+        next(error);
+    }
+};
+
+

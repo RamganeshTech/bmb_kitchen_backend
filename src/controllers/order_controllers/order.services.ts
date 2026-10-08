@@ -7,6 +7,8 @@ import TaxSettingsModel from '../../models/taxSettings_model/taxSetting.model.js
 import LoyaltyProgramModel from '../../models/loyaltyProgram_model/loyaltyProgram.model.js';
 import OfferModel from '../../models/offer_model/offer.model.js';
 import MenuItemModel from '../../models/menu_models/menuItem.model.js';
+import { ReportScope, resolveDateRange } from '../report_controllers/report-filters.util.js';
+import { DAY_MS, startOfDayIST } from '../../utils/dateRange.js';
 
 // ── INTERNAL HELPER: CALCULATE TOTALS ─────────────────────────────
 // const recalculateTotals = (
@@ -228,9 +230,16 @@ const buildCheckoutQuote = async (
     offer = await OfferModel.findOne({ _id: input.offerId, organizationId, isActive: true }).session(s);
     if (!offer) throw new ApiError(404, 'Offer not found or inactive');
 
-    const endOfDay = new Date(offer.endDate);
-    endOfDay.setHours(23, 59, 59, 999);
-    if (new Date() < offer.startDate || new Date() > endOfDay) throw new ApiError(400, 'This offer is not valid today');
+    // const endOfDay = new Date(offer.endDate);
+    // endOfDay.setHours(23, 59, 59, 999);
+    // if (new Date() < offer.startDate || new Date() > endOfDay) throw new ApiError(400, 'This offer is not valid today');
+
+
+    const now = new Date();
+    const offerStart = startOfDayIST(offer.startDate);
+    const offerEnd = new Date(startOfDayIST(offer.endDate).getTime() + DAY_MS - 1);
+
+    if (now < offerStart || now > offerEnd) throw new ApiError(400, 'This offer is not valid today');
     if (subTotal < offer.minOrderAmount) {
       throw new ApiError(400, `Minimum order of ₹${offer.minOrderAmount} required for this offer`);
     }
@@ -560,6 +569,120 @@ export const getActiveOrders = async (
     .sort({ createdAt: -1 });
 };
 
+
+interface MyOrdersFilters {
+  outletId?: string;
+  scope?: ReportScope | 'all';
+  from?: string;            // YYYY-MM-DD, used when scope = custom
+  to?: string;
+  orderType?: 'dine_in' | 'takeaway' | 'delivery' | 'online';
+  paymentMethod?: 'cash' | 'card' | 'upi' | 'split';
+  tableId?: string;
+  customerId?: string;
+  search?: string;          // orderNo or billNo
+  minAmount?: number;
+  maxAmount?: number;
+  hasDiscount?: boolean;
+  sortBy?: 'paidAt' | 'grandTotal';
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  limit?: number;
+}
+
+export const listMyOrders = async (
+  organizationId: string,
+  userId: string,
+  filters: MyOrdersFilters
+) => {
+  const page = Math.max(filters.page ?? 1, 1);
+  const limit = Math.min(Math.max(filters.limit ?? 20, 1), 100);
+
+  const match: Record<string, any> = {
+    organizationId: new Types.ObjectId(organizationId),
+    createdBy: new Types.ObjectId(userId),     // only this user's orders
+    orderStatus: 'completed',
+    paymentStatus: 'paid',                      // never running orders
+    isActive: true,
+  };
+
+  if (filters.outletId) match.outletId = new Types.ObjectId(filters.outletId);
+  if (filters.tableId) match.tableId = new Types.ObjectId(filters.tableId);
+  if (filters.customerId) match.customerId = new Types.ObjectId(filters.customerId);
+  if (filters.orderType) match.orderType = filters.orderType;
+  if (filters.paymentMethod) match.paymentMethod = filters.paymentMethod;
+
+  if (filters.scope !== 'all') {
+    const { start, end } = resolveDateRange(filters.scope ?? 'today', filters.from, filters.to);
+    match.paidAt = { $gte: start, $lte: end };
+  }
+
+  if (filters.minAmount !== undefined || filters.maxAmount !== undefined) {
+    match.grandTotal = {};
+    if (filters.minAmount !== undefined) match.grandTotal.$gte = filters.minAmount;
+    if (filters.maxAmount !== undefined) match.grandTotal.$lte = filters.maxAmount;
+  }
+
+  if (filters.hasDiscount === true) match.discountAmount = { $gt: 0 };
+  if (filters.hasDiscount === false) match.discountAmount = 0;
+
+  if (filters.search) {
+    const escaped = filters.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    match.$or = [
+      { orderNo: { $regex: escaped, $options: 'i' } },
+      { billNo: { $regex: escaped, $options: 'i' } },
+    ];
+  }
+
+  const sortField = filters.sortBy === 'grandTotal' ? 'grandTotal' : 'paidAt';
+  const sortDir = filters.sortOrder === 'asc' ? 1 : -1;
+
+  const [orders, total, summaryAgg, byMethodAgg] = await Promise.all([
+    OrderModel.find(match)
+      .sort({ [sortField]: sortDir, _id: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .populate('tableId', 'name tableName tableNumber tableNo')
+      .populate('customerId', 'name phone')
+      .populate('outletId', 'name code')
+      .populate('appliedOfferId', 'title code')
+      .populate('createdBy', 'name email')
+      .lean(),
+    OrderModel.countDocuments(match),
+    OrderModel.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: null,
+          totalCollected: { $sum: '$grandTotal' },
+          totalDiscounts: { $sum: '$discountAmount' },
+          totalOrders: { $sum: 1 },
+        },
+      },
+    ]),
+    OrderModel.aggregate([
+      { $match: match },
+      { $group: { _id: '$paymentMethod', amount: { $sum: '$grandTotal' }, count: { $sum: 1 } } },
+    ]),
+  ]);
+
+  const summary = summaryAgg[0] ?? { totalCollected: 0, totalDiscounts: 0, totalOrders: 0 };
+
+  return {
+    orders,
+    summary: {
+      totalCollected: summary.totalCollected,
+      totalDiscounts: summary.totalDiscounts,
+      totalOrders: summary.totalOrders,
+      avgOrderValue: summary.totalOrders ? summary.totalCollected / summary.totalOrders : 0,
+      byPaymentMethod: byMethodAgg.map((m) => ({ mode: m._id, amount: m.amount, count: m.count })),
+    },
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  };
+};
+
 // ── 6. GET ORDER BY ID ────────────────────────────────────────────
 export const getOrderById = async (
   organizationId: string | Types.ObjectId,
@@ -662,11 +785,16 @@ export const listOrdersByType = async (
     if (filters.from) query.createdAt.$gte = new Date(filters.from);
     if (filters.to) query.createdAt.$lte = new Date(filters.to);
   } else if (!filters.orderStatus && (filters.scope === 'today' || !filters.scope)) {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
-    query.createdAt = { $gte: startOfDay, $lte: endOfDay };
+    // const startOfDay = new Date();
+    // startOfDay.setHours(0, 0, 0, 0);
+    // const endOfDay = new Date();
+    // endOfDay.setHours(23, 59, 59, 999);
+    // query.createdAt = { $gte: startOfDay, $lte: endOfDay };
+
+    const { start, end } = resolveDateRange('today');
+    query.createdAt = { $gte: start, $lte: end };
+
+
   }
 
   const page = filters.page && filters.page > 0 ? filters.page : 1;
@@ -707,6 +835,10 @@ export const listKitchenItems = async (
     scope?: 'running' | 'today';
     page?: number;
     limit?: number;
+    range?: 'today' | 'week' | 'month' | 'year' | 'custom';
+    from?: string;
+    to?: string;
+    search?: string;
   }
 ) => {
   const page = Math.max(filters.page ?? 1, 1);
@@ -720,13 +852,33 @@ export const listKitchenItems = async (
   if (filters.outletId) baseMatch.outletId = new Types.ObjectId(filters.outletId);
   if (filters.orderType) baseMatch.orderType = filters.orderType;
 
-  if (filters.scope === 'today') {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-    baseMatch.createdAt = { $gte: startOfDay };
+  // if (filters.scope === 'today') {
+  //   const startOfDay = new Date();
+  //   startOfDay.setHours(0, 0, 0, 0);
+  //   baseMatch.createdAt = { $gte: startOfDay };
+  //   baseMatch.orderStatus = { $ne: 'cancelled' };
+  // } else {
+  //   baseMatch.orderStatus = 'active';
+  // }
+
+  if (filters.range) {
+    // date filter wins over scope
+    const { start, end } = resolveDateRange(filters.range, filters.from, filters.to);
+    baseMatch.createdAt = { $gte: start, $lte: end };
+    baseMatch.orderStatus = { $ne: 'cancelled' };
+  } else if (filters.scope === 'today') {
+    // const startOfDay = new Date();
+    // startOfDay.setHours(0, 0, 0, 0);
+    const { start } = resolveDateRange('today');
+    baseMatch.createdAt = { $gte: start };
     baseMatch.orderStatus = { $ne: 'cancelled' };
   } else {
     baseMatch.orderStatus = 'active';
+  }
+
+  if (filters.search) {
+    const escaped = filters.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    baseMatch.orderNo = { $regex: escaped, $options: 'i' };
   }
 
   const statusMatch = { $match: { 'items.status': { $in: statuses } } };

@@ -1,8 +1,9 @@
 import { Types } from 'mongoose';
-import { resolveDateRange, ReportScope } from './report-filters.util.js';
+import { ReportScope, resolveDateRange } from './report-filters.util.js';
 import OrderModel from '../../models/order_models/order.model.js';
 import ExpenseModel from '../../models/expense_model/expense.model.js';
 import TaxSettingsModel from '../../models/taxSettings_model/taxSetting.model.js';
+import { DEFAULT_TIMEZONE } from '../../constants/constants.js';
 
 interface BaseFilters {
   outletId?: string;
@@ -52,7 +53,8 @@ export const getSalesReport = async (organizationId: string, filters: BaseFilter
       { $match: match },
       {
         $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$paidAt' } },
+          // _id: { $dateToString: { format: '%Y-%m-%d', date: '$paidAt' } },
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$paidAt', timezone: DEFAULT_TIMEZONE } },
           sales: { $sum: '$grandTotal' },
           bills: { $sum: 1 },
         },

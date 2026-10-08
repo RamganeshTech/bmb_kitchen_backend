@@ -1,6 +1,7 @@
 import OrderModel, { OrderType, PaymentMethod } from "../../models/order_models/order.model.js";
 import { ApiError } from "../../utils/apiError.js";
-import {Types} from "mongoose"
+import { Types } from "mongoose"
+import { resolveDateRange } from "../report_controllers/report-filters.util.js";
 
 interface ListPaymentsFilters {
   outletId?: string;
@@ -25,29 +26,49 @@ export const listPayments = async (organizationId: string, filters: ListPayments
   if (filters.orderType) query.orderType = filters.orderType;
 
   // Explicit date range wins over scope
+  // if (filters.from || filters.to) {
+  //   query.paidAt = {};
+  //   if (filters.from) query.paidAt.$gte = new Date(filters.from);
+  //   if (filters.to) query.paidAt.$lte = new Date(filters.to);
+  // } 
+  // else {
+  //   const now = new Date();
+  //   if (filters.scope === 'week') {
+  //     const startOfWeek = new Date(now);
+  //     startOfWeek.setDate(now.getDate() - now.getDay());
+  //     startOfWeek.setHours(0, 0, 0, 0);
+  //     query.paidAt = { $gte: startOfWeek };
+  //   } else if (filters.scope === 'month') {
+  //     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  //     query.paidAt = { $gte: startOfMonth };
+  //   } else if (filters.scope === 'today' || !filters.scope) {
+  //     const startOfDay = new Date();
+  //     startOfDay.setHours(0, 0, 0, 0);
+  //     const endOfDay = new Date();
+  //     endOfDay.setHours(23, 59, 59, 999);
+  //     query.paidAt = { $gte: startOfDay, $lte: endOfDay };
+  //   }
+  //   else if (filters.scope !== 'all') {
+  //     const { start, end } = resolveDateRange(filters.scope ?? 'today');
+  //     query.paidAt = { $gte: start, $lte: end };
+  //   }
+  // }
+
+
+  // Explicit date range wins over scope
   if (filters.from || filters.to) {
     query.paidAt = {};
     if (filters.from) query.paidAt.$gte = new Date(filters.from);
     if (filters.to) query.paidAt.$lte = new Date(filters.to);
-  } else {
-    const now = new Date();
-    if (filters.scope === 'week') {
-      const startOfWeek = new Date(now);
-      startOfWeek.setDate(now.getDate() - now.getDay());
-      startOfWeek.setHours(0, 0, 0, 0);
-      query.paidAt = { $gte: startOfWeek };
-    } else if (filters.scope === 'month') {
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      query.paidAt = { $gte: startOfMonth };
-    } else if (filters.scope === 'today' || !filters.scope) {
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date();
-      endOfDay.setHours(23, 59, 59, 999);
-      query.paidAt = { $gte: startOfDay, $lte: endOfDay };
-    }
-    // scope === 'all' → no paidAt filter
+  } else if (filters.scope !== 'all') {
+    // today (default), week, month, year
+    const { start, end } = resolveDateRange(filters.scope ?? 'today');
+    query.paidAt = { $gte: start, $lte: end };
   }
+  // scope === 'all' → no paidAt filter
+
+  // scope === 'all' → no paidAt filter
+  // scope === 'all' → no paidAt filter
 
   const page = filters.page && filters.page > 0 ? filters.page : 1;
   const limit = filters.limit && filters.limit > 0 ? Math.min(filters.limit, 200) : 200;
