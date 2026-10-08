@@ -2,12 +2,41 @@ import mongoose, { Types } from 'mongoose';
 import { IInventory, InventoryModel } from '../../models/inventory_model/Inventory.model.js';
 import { ApiError } from '../../utils/apiError.js';
 import WastageAdjustmentModel, { IWastageAdjustment } from '../../models/wasteAdjustment_model/wastageAdjustment.model.js';
+import { assertImages, uploadImages } from '../menu_items/menuItem.services.js';
+import { IUpload } from '../../models/user_models/user.model.js';
+import { uploadFileToS3 } from '../../utils/s3Upload.js';
+
+
+// export const MAX_INVENTORY_IMAGES = 5;
+
+
+const assertImage = (file?: Express.Multer.File) => {
+  if (file && !file.mimetype.startsWith('image/')) {
+    throw new ApiError(400, `Only image files are allowed (${file.originalname})`);
+  }
+};
+
+
+const uploadImage = async (file?: Express.Multer.File) => {
+  if(!file) return null
+  const up = await uploadFileToS3(file); // same import as your menu item service
+  return {
+    type: 'image' as const,
+    key: up.key,
+    url: up.url,
+    originalName: up.originalName,
+    uploadedAt: up.uploadedAt,
+  };
+};
+
 
 // ── CREATE ────────────────────────────────────────────────────────
 export const createInventory = async (
   organizationId: string | Types.ObjectId,
   userId: string | Types.ObjectId,
-  data: Partial<IInventory>
+  data: Partial<IInventory>,
+  file?: Express.Multer.File
+
 ): Promise<IInventory> => {
   const existingItem = await InventoryModel.findOne({
     organizationId,
@@ -18,14 +47,70 @@ export const createInventory = async (
     throw new ApiError(409, 'Inventory item with this material name already exists');
   }
 
+
+  assertImage(file);
+  const image = await uploadImage(file);
+
+
   const item = await InventoryModel.create({
     ...data,
+    image,
     organizationId,
     createdBy: userId,
   });
 
   return item;
 };
+
+
+// ── ADD EXTRA IMAGES ──────────────────────────────────────────────
+export const addInventoryImages = async (
+  organizationId: string,
+  inventoryId: string,
+  userId: string,
+  file: Express.Multer.File
+): Promise<any> => {
+  const item = await InventoryModel.findOne({ _id: inventoryId, organizationId });
+  if (!item) throw new ApiError(404, 'Menu item not found');
+
+  assertImage(file);
+
+  const newImage = await uploadImage(file);
+
+  item.image = newImage as IUpload;
+  item.updatedBy = userId as unknown as Types.ObjectId;
+  await item.save();
+
+
+  return item;
+};
+
+// ── REMOVE ONE IMAGE ──────────────────────────────────────────────
+export const removeInventoryImage = async (
+  organizationId: string,
+  inventoryId: string,
+  userId: string
+): Promise<any> => {
+  const item = await InventoryModel.findOne({ _id: inventoryId, organizationId });
+  if (!item) throw new ApiError(404, 'Menu item not found');
+    if (!item.image) throw new ApiError(404, 'This item has no image');
+
+  item.image = null;
+  item.updatedBy = userId as unknown as Types.ObjectId;
+  await item.save();
+
+  // Best effort: the record is already gone, so a failed S3 delete shouldn't fail the request
+  // try {
+  //   if (target.key) await deleteFileFromS3(target.key);
+  // } catch (err) {
+  //   console.error('Failed to delete menu item image from S3:', err);
+  // }
+
+  return item;
+};
+
+
+
 
 // ── LIST (active, full detail) ───────────────────────────────────
 export const getInventoryList = async (
@@ -163,11 +248,11 @@ export const restoreInventory = async (
     { isActive: true, updatedBy: userId },
     { new: true }
   );
- 
+
   if (!item) {
     throw new ApiError(404, 'Inventory item not found');
   }
- 
+
   return item;
 };
 
@@ -184,27 +269,27 @@ export const adjustInventoryStock = async (
   reason?: string
 ): Promise<IInventory> => {
   const session = await mongoose.startSession();
- 
+
   try {
     let inventoryItem!: IInventory;
- 
+
     await session.withTransaction(async () => {
       const item = await InventoryModel.findOne({ _id: inventoryId, organizationId }).session(
         session
       );
- 
+
       if (!item) {
         throw new ApiError(404, 'Inventory item not found');
       }
- 
+
       if (action === 'remove' && item.inStock < quantity) {
         throw new ApiError(400, 'Quantity exceeds current stock on hand');
       }
- 
+
       item.inStock = action === 'add' ? item.inStock + quantity : item.inStock - quantity;
       item.value = item.inStock * item.rate;
       await item.save({ session });
- 
+
       await WastageAdjustmentModel.create(
         [
           {
@@ -220,13 +305,12 @@ export const adjustInventoryStock = async (
         ] as any,
         { session }
       );
- 
+
       inventoryItem = item;
     });
- 
+
     return inventoryItem;
   } finally {
     session.endSession();
   }
 };
- 

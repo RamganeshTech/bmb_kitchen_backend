@@ -1,4 +1,5 @@
 import { Schema, model, Document, Types } from 'mongoose';
+import { IUpload } from '../user_models/user.model.js';
 
 /**
  * Common units of measure for restaurant inventory.
@@ -9,6 +10,7 @@ export type InventoryUnit = 'kg' | 'g' | 'l' | 'ml' | 'pcs' | 'packet' | 'box' |
 export interface IInventory extends Document {
     organizationId: Types.ObjectId;
     inventoryNo: string;
+    image: IUpload | null
     material: string;
     category: string;
     unit: InventoryUnit;
@@ -24,6 +26,16 @@ export interface IInventory extends Document {
     updatedBy?: Types.ObjectId;
 }
 
+
+
+const uploadSchema = new Schema<IUpload>({
+    type: { type: String, enum: ["image"] },
+    key: { type: String, },
+    url: { type: String, },
+    originalName: String,
+    uploadedAt: { type: Date, default: Date.now }
+}, {_id: true});
+
 const inventorySchema = new Schema<IInventory>(
     {
         organizationId: {
@@ -31,6 +43,11 @@ const inventorySchema = new Schema<IInventory>(
             ref: 'OrganizationModel',
             required: true,
         },
+
+        image: {
+            type: uploadSchema, default: null
+        },
+
         inventoryNo: {
             type: String,
             // uniqueness is enforced per-organization by the compound index below,
@@ -75,7 +92,7 @@ const inventorySchema = new Schema<IInventory>(
         vendorId: {
             type: Schema.Types.ObjectId,
             ref: 'VendorModel',
-              default: null,
+            default: null,
         },
         isActive: {
             type: Boolean,

@@ -16,7 +16,7 @@ export const assertImages = (files: Express.Multer.File[]) => {
 };
 
 
-const uploadImages = async (files: Express.Multer.File[]) =>
+export const uploadImages = async (files: Express.Multer.File[]) =>
   Promise.all(
     files.map(async (file) => {
       const up = await uploadFileToS3(file);

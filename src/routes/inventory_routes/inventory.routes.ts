@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as inventoryController from '../../controllers/inventory_controllers/inventory.controller.js';
 
 import { multiAuthRole } from '../../middleware/auth.middleware.js';
+import { upload } from '../../utils/s3Upload.js';
 
 const inventoryRoutes = Router({ mergeParams: true });
 
@@ -18,7 +19,23 @@ inventoryRoutes.get(
 inventoryRoutes.post(
   '/v1/:organizationId',
   multiAuthRole('owner', 'admin', 'cto'),
+  upload.single("file"),
   inventoryController.createInventory
+);
+
+// update (replace) picture
+inventoryRoutes.put(
+  "/v1/:organizationId/:inventoryId/image",
+  multiAuthRole("owner", "admin", "cto", "staff"),
+  upload.single("file"),
+  inventoryController.addInventoryImage
+);
+
+// remove picture
+inventoryRoutes.delete(
+  "/v1/:organizationId/:inventoryId/image",
+  multiAuthRole("owner", "admin", "cto", "staff"),
+  inventoryController.removeInventoryImage
 );
 
 // GET /api/inventory/v1/:organizationId/dropdown (Minimal fields for selectors/dropdowns)
