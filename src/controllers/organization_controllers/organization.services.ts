@@ -4,6 +4,7 @@ import UserModel from "../../models/user_models/user.model.js";
 import { ApiError } from "../../utils/apiError.js";
 import { generateToken, hashPassword } from "../user_controllers/auth.service.js";
 import OrganizationModel, { IOrganization } from "../../models/organization/organization.model.js";
+import { uploadFileToS3 } from "../../utils/s3Upload.js";
 
 // ── CREATE ORG + OWNER USER (registration) ────────────────────────
 export const createOrganization = async (
@@ -104,6 +105,37 @@ export const updateOrganization = async (
   if (!organization) throw new ApiError(404, "Organization not found");
   return organization;
 };
+
+
+export const updateOrganizationImage = async (
+  organizationId: string,
+  file: Express.Multer.File
+): Promise<{ org: IOrganization }> => {
+  if (!file.mimetype.startsWith("image/")) {
+    throw new ApiError(400, "Only image files are allowed for profile image");
+  }
+
+  const org = await OrganizationModel.findById(organizationId);
+  if (!org) {
+    throw new ApiError(404, "org not found");
+  }
+
+  const uploadedData = await uploadFileToS3(file);
+
+  org.logo = {
+    type: "image",
+    key: uploadedData.key,
+    url: uploadedData.url,
+    originalName: uploadedData.originalName,
+    uploadedAt: uploadedData.uploadedAt,
+  };
+
+  await org.save();
+
+  return { org };
+};
+
+
 
 // ── DELETE (soft delete) ──────────────────────────────────────────
 export const deleteOrganization = async (

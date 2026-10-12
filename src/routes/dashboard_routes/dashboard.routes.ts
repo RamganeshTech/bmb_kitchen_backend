@@ -24,9 +24,9 @@ dashboardRoutes.get(
 
 // GET /api/dashboard/v1/:organizationId/:outletId/sales-by-hour
 dashboardRoutes.get(
-  '/v1/:organizationId/:outletId/sales-by-hour',
+  '/v1/:organizationId/:outletId/sales-by-trend',
   multiAuthRole('owner', 'admin', 'cto', 'staff'),
-  dashboardController.getSalesByHour
+  dashboardController.getSalesTrend
 );
 
 // GET /api/dashboard/v1/:organizationId/:outletId/kitchen-ticket-status
@@ -57,6 +57,11 @@ dashboardRoutes.get(
   dashboardController.getQuickStats
 );
 
-
+// GET /api/dashboard/v1/:organizationId/:outletId/sales-by-order-type
+dashboardRoutes.get(
+  '/v1/:organizationId/:outletId/sales-by-order-type',
+  multiAuthRole('owner', 'admin', 'cto', 'staff'),
+  dashboardController.getSalesByOrderType 
+);
 
 export default dashboardRoutes;

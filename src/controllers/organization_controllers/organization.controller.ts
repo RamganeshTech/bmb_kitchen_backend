@@ -72,6 +72,38 @@ export const updateOrganization = async (
   }
 };
 
+
+
+export const updateOrganizationImage = async (
+  req: RoleBasedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { organizationId } = req.params;
+    const file = req.file;
+
+    if (!organizationId) {
+      res.status(400).json({ ok: false, message: "organizationId is required" });
+      return;
+    }
+    // if (!userId) {
+    //   res.status(400).json({ ok: false, message: "userId is required" });
+    //   return;
+    // }
+    if (!file) {
+      res.status(400).json({ ok: false, message: "file is required" });
+      return;
+    }
+
+    const result = await organizationService.updateOrganizationImage(organizationId, file);
+
+    res.status(200).json({ ok: true, data: result, message: "Logo updated successfully" });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const deleteOrganization = async (
   req: Request,
   res: Response,

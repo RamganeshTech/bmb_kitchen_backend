@@ -118,7 +118,10 @@ export const getItemSalesReport = async (organizationId: string, filters: BaseFi
     { $sort: { revenue: -1 } },
   ]);
 
-  const topRevenue = items[0]?.revenue || 1;
+  // const topRevenue = items[0]?.revenue || 1;
+
+  const totalRevenue = items.reduce((sum, i) => sum + i.revenue, 0) || 1;
+
 
   return {
     range: { from: start, to: end },
@@ -128,7 +131,8 @@ export const getItemSalesReport = async (organizationId: string, filters: BaseFi
       name: i.name,
       qtySold: i.qtySold,
       revenue: i.revenue,
-      sharePercent: Math.round((i.revenue / topRevenue) * 1000) / 10,
+      // sharePercent: Math.round((i.revenue / topRevenue) * 1000) / 10,
+      sharePercent: Math.round((i.revenue / totalRevenue) * 1000) / 10,
     })),
   };
 };
